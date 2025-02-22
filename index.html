@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Outpost Defense</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="title">Outpost Defense</div>
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div class="controls">
+            <button onclick="game.buildWorker()" class="worker-btn" data-shortcut="Q">Build Worker (50 💎)</button>
+            <button onclick="game.buildTurret()" class="turret-btn" data-shortcut="T">Build Turret (100 💎)</button>
+            <button onclick="game.buildBattery()" class="battery-btn" data-shortcut="B">Build Shield Battery (150 💎)</button>
+        </div>
+        <div id="floating-upgrade-btn" class="floating-button" style="display: none">
+            <button onclick="game.upgradeTurret()" class="upgrade-btn">Upgrade Turret</button>
+        </div>
+    </div>
+
+    <!-- Load modules -->
+    <script type="module">
+        import { Game } from './js/game.js';
+        import { initializeEventListeners } from './js/systems/InputSystem.js';
+
+        // Initialize game
+        const canvas = document.getElementById('gameCanvas');
+        const game = new Game(canvas);
+        
+        // Initialize input handlers
+        initializeEventListeners(game);
+        
+        // Start game loop
+        game.start();
+
+        // Make game instance available globally for button onclick handlers
+        window.game = game;
+    </script>
+</body>
+</html>
