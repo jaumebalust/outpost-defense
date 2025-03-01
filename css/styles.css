@@ -28,7 +28,21 @@ canvas {
     height: 100%;
 }
 
+/* Original controls positioning - COMMENTED OUT to avoid conflicts with new UI
 .controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+    margin-bottom: 15px;
+    z-index: 10;
+}
+*/
+
+/* The game-ui-controls class can be used for other controls that should be centered */
+.game-ui-controls {
     position: fixed;
     bottom: 20px;
     left: 50%;
@@ -162,4 +176,147 @@ button::after {
 
 .floating-button .upgrade-btn:disabled {
     background: #95a5a6;
+}
+
+.sound-btn {
+    background-color: #2ecc71;
+    border: 2px solid #27ae60;
+    padding: 8px 16px;
+    border-radius: 4px;
+    color: white;
+    font-family: 'Orbitron', sans-serif;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.sound-btn:hover {
+    background-color: #27ae60;
+    transform: scale(1.05);
+}
+
+/* StarCraft-style UI - Moved from inline styles */
+.game-ui {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 150px;
+    display: flex;
+    justify-content: center;
+    pointer-events: none; /* Let clicks pass through to canvas except for buttons */
+}
+
+.info-panel {
+    position: absolute;
+    bottom: 10px;
+    width: 400px;
+    height: 130px;
+    background-color: rgba(0, 20, 40, 0.7);
+    border: 2px solid #4a9eff;
+    border-radius: 5px;
+    display: flex;
+    pointer-events: auto;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.unit-portrait {
+    width: 100px;
+    height: 100px;
+    background-color: #000;
+    margin: 5px;
+    border: 1px solid #4a9eff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 40px;
+}
+
+.unit-info {
+    flex: 1;
+    color: white;
+    padding: 10px;
+    font-family: 'Orbitron', sans-serif;
+}
+
+.unit-name {
+    font-size: 18px;
+    margin-bottom: 5px;
+    color: #4a9eff;
+}
+
+.unit-stats {
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+}
+
+.controls {
+    position: fixed !important;
+    bottom: 10px !important;
+    right: 10px !important;
+    width: 250px;
+    height: 250px;
+    background-color: rgba(0, 20, 40, 0.7);
+    border: 2px solid #4a9eff;
+    border-radius: 5px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 5px;
+    padding: 10px;
+    pointer-events: auto;
+    z-index: 100;
+}
+
+.controls button {
+    margin: 0;
+    height: 70px;
+    width: 70px;
+    font-size: 12px;
+    border-radius: 0;
+    background-color: #003366;
+    color: white;
+    border: 1px solid #4a9eff;
+    position: relative;
+    text-align: center;
+    transition: background-color 0.2s;
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.controls button:hover {
+    background-color: #004080;
+}
+
+.controls button:active {
+    background-color: #002040;
+}
+
+.controls button::before {
+    content: attr(data-icon);
+    font-size: 24px;
+    margin-bottom: 5px;
+}
+
+.controls button[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Added for hidden buttons */
+.hidden-button {
+    visibility: hidden;
+}
+
+#floating-upgrade-btn {
+    z-index: 100;
+}
+
+/* Added for hiding elements */
+.hidden {
+    display: none;
 } 

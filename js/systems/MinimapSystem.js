@@ -10,7 +10,7 @@ export class MinimapSystem {
         const scaleX = minimapSize / game.camera.worldWidth;
         const scaleY = minimapSize / game.camera.worldHeight;
         
-        // Draw minimap background
+        // Draw minimap background - moved back to bottom-left corner
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(
             padding,
@@ -28,6 +28,11 @@ export class MinimapSystem {
             minimapSize,
             minimapSize
         );
+        
+        // Draw minimap title
+        ctx.fillStyle = '#4a9eff';
+        ctx.font = 'bold 14px "Orbitron", sans-serif';
+        ctx.fillText('TACTICAL MAP', padding + 50, ctx.canvas.height - minimapSize - padding - 10);
 
         // Draw mineral patches
         game.mineralPatches.forEach(patch => {
@@ -38,6 +43,25 @@ export class MinimapSystem {
             ctx.arc(x, y, 3, 0, Math.PI * 2);
             ctx.fill();
         });
+
+        // Draw connection line between base and default mineral patch
+        if (game.base.defaultMineralPatch && game.selectedBase) {
+            const baseX = padding + (game.base.x * scaleX);
+            const baseY = ctx.canvas.height - minimapSize - padding + (game.base.y * scaleY);
+            const patchX = padding + (game.base.defaultMineralPatch.x * scaleX);
+            const patchY = ctx.canvas.height - minimapSize - padding + (game.base.defaultMineralPatch.y * scaleY);
+            
+            // Draw dashed line
+            ctx.save();
+            ctx.strokeStyle = 'rgba(74, 158, 255, 0.6)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(baseX, baseY);
+            ctx.lineTo(patchX, patchY);
+            ctx.stroke();
+            ctx.restore();
+        }
 
         // Draw base
         ctx.fillStyle = '#4a9eff';
@@ -92,11 +116,13 @@ export class MinimapSystem {
         const minimapSize = MinimapSystem.MINIMAP_SIZE;
         const padding = MinimapSystem.MINIMAP_PADDING;
         
-        // Check if click is within minimap bounds
+        // Check if click is within minimap bounds - updated back to bottom-left position
         if (x >= padding &&
             x <= padding + minimapSize &&
             y >= game.canvas.height - minimapSize - padding &&
             y <= game.canvas.height - padding) {
+            
+            console.log('Minimap click detected at:', x, y);
             
             // Convert minimap coordinates to world coordinates
             const scaleX = game.camera.worldWidth / minimapSize;
@@ -105,16 +131,25 @@ export class MinimapSystem {
             const worldX = (x - padding) * scaleX;
             const worldY = (y - (game.canvas.height - minimapSize - padding)) * scaleY;
             
+            console.log('Converted to world coordinates:', worldX, worldY);
+            
             // Center the camera on the clicked point
             game.camera.x = Math.max(0, Math.min(
-                game.camera.worldWidth - game.canvas.width,
-                worldX - game.canvas.width / 2
+                game.camera.worldWidth - game.canvas.width / game.camera.zoom,
+                worldX - (game.canvas.width / game.camera.zoom) / 2
             ));
             game.camera.y = Math.max(0, Math.min(
-                game.camera.worldHeight - game.canvas.height,
-                worldY - game.canvas.height / 2
+                game.camera.worldHeight - game.canvas.height / game.camera.zoom,
+                worldY - (game.canvas.height / game.camera.zoom) / 2
             ));
             
+            // Reset camera velocity to prevent drift after clicking
+            if (game.camera.velocityX !== undefined) {
+                game.camera.velocityX = 0;
+                game.camera.velocityY = 0;
+            }
+            
+            console.log('Camera position updated to:', game.camera.x, game.camera.y);
             return true; // Click was handled
         }
         
@@ -125,6 +160,7 @@ export class MinimapSystem {
         const minimapSize = MinimapSystem.MINIMAP_SIZE;
         const padding = MinimapSystem.MINIMAP_PADDING;
         
+        // Updated back to check bottom-left corner
         return x >= padding &&
                x <= padding + minimapSize &&
                y >= canvasHeight - minimapSize - padding &&

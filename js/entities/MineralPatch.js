@@ -13,6 +13,7 @@ export class MineralPatch {
         this.miningDelay = 800;  // Mining delay in milliseconds
         this.lastMineTime = 0;  // Last time minerals were mined
         this.isSelected = false;  // Track if patch is selected
+        this.lastWorkerCleanup = Date.now(); // Track when we last cleaned up worker references
     }
 
     canStartMining(worker) {
@@ -38,6 +39,10 @@ export class MineralPatch {
             
             this.currentMiner = worker;
             this.lastMineTime = Date.now();
+            
+            // Run queue validation when starting mining
+            this.validateMiningQueue(worker.game);
+            
             return true;
         } else if (!this.miningQueue.includes(worker) && 
                    worker.minerals < worker.maxMinerals &&
@@ -56,6 +61,7 @@ export class MineralPatch {
     finishMining() {
         // Store previous miner before clearing
         const previousMiner = this.currentMiner;
+        const hasGame = previousMiner && previousMiner.game;
         
         // Clear current miner and reset mining time
         this.currentMiner = null;
@@ -63,6 +69,10 @@ export class MineralPatch {
 
         // Don't start next worker immediately if previous worker is full
         if (previousMiner && (previousMiner.minerals >= previousMiner.maxMinerals || this.minerals <= 0)) {
+            // Run queue validation after finishing mining
+            if (hasGame) {
+                this.validateMiningQueue(previousMiner.game);
+            }
             return;
         }
 
@@ -92,6 +102,51 @@ export class MineralPatch {
                 this.miningQueue.shift();
                 this.startMining(nextWorker);
             }
+        }
+        
+        // Run queue validation after finishing mining
+        if (hasGame) {
+            this.validateMiningQueue(previousMiner.game);
+        }
+    }
+    
+    // New method to validate and fix the mining queue
+    validateMiningQueue(game) {
+        if (!game) return;
+        
+        // Periodically perform more thorough cleanup (every 5 seconds)
+        const now = Date.now();
+        if (now - this.lastWorkerCleanup > 5000) {
+            // Verify the current miner is still valid
+            if (this.currentMiner && 
+                (!game.workers.includes(this.currentMiner) || 
+                 this.currentMiner.targetPatch !== this)) {
+                this.currentMiner = null;
+                this.lastMineTime = now; // Reset mining time
+            }
+            
+            // Filter the mining queue to remove invalid workers
+            this.miningQueue = this.miningQueue.filter(worker => 
+                game.workers.includes(worker) && 
+                worker.targetPatch === this &&
+                worker.minerals < worker.maxMinerals &&
+                worker.state !== 'mining'
+            );
+            
+            // Periodically verify worker count accuracy
+            let actualWorkerCount = 0;
+            game.workers.forEach(worker => {
+                if (worker.targetPatch === this) {
+                    actualWorkerCount++;
+                }
+            });
+            
+            // Update worker count if it doesn't match reality
+            if (this.workers !== actualWorkerCount) {
+                this.workers = actualWorkerCount;
+            }
+            
+            this.lastWorkerCleanup = now;
         }
     }
 
@@ -140,7 +195,7 @@ export class MineralPatch {
         ctx.fillStyle = 'white';
         ctx.font = `${Math.floor(16 * SIZE_MULTIPLIER)}px Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText(Math.floor(this.minerals), screenX, screenY + visualSize/2 + 20);
+        ctx.fillText(Math.round(this.minerals), screenX, screenY + visualSize/2 + 20);
         
         // Draw worker count and queue info
         if (this.workers > 0) {

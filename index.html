@@ -7,17 +7,42 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Inline styles have been moved to styles.css -->
 </head>
 <body>
     <div class="title">Outpost Defense</div>
     <div class="game-container">
         <canvas id="gameCanvas"></canvas>
-        <div class="controls">
-            <button onclick="game.buildWorker()" class="worker-btn" data-shortcut="Q">Build Worker (50 💎)</button>
-            <button onclick="game.buildTurret()" class="turret-btn" data-shortcut="T">Build Turret (100 💎)</button>
-            <button onclick="game.buildBattery()" class="battery-btn" data-shortcut="B">Build Shield Battery (150 💎)</button>
+        
+        <!-- New StarCraft-style UI -->
+        <div class="game-ui">
+            <div class="info-panel" id="info-panel">
+                <div class="unit-portrait" id="unit-portrait">?</div>
+                <div class="unit-info">
+                    <div class="unit-name" id="unit-name">No Selection</div>
+                    <div class="unit-stats" id="unit-stats">
+                        Select a unit, building, or resource to view information.
+                    </div>
+                </div>
+            </div>
         </div>
-        <div id="floating-upgrade-btn" class="floating-button" style="display: none">
+        
+        <!-- Action buttons moved outside game-ui to prevent centering -->
+        <div class="controls" id="action-buttons">
+            <button onclick="game.buildWorker()" class="worker-btn" data-shortcut="Q" data-icon="👷">Worker</button>
+            <button onclick="game.buildTurret()" class="turret-btn" data-shortcut="T" data-icon="🔫">Turret</button>
+            <button onclick="game.buildBattery()" class="battery-btn" data-shortcut="B" data-icon="🛡️">Shield</button>
+            <button onclick="game.toggleSound()" class="sound-btn" data-shortcut="M" data-icon="🔊">Sound</button>
+            
+            <!-- Empty slots for StarCraft-like grid -->
+            <button class="hidden-button"></button>
+            <button class="hidden-button"></button>
+            <button class="hidden-button"></button>
+            <button class="hidden-button"></button>
+            <button class="hidden-button"></button>
+        </div>
+        
+        <div id="floating-upgrade-btn" class="floating-button hidden">
             <button onclick="game.upgradeTurret()" class="upgrade-btn">Upgrade Turret</button>
         </div>
     </div>
@@ -26,6 +51,7 @@
     <script type="module">
         import { Game } from './js/game.js';
         import { initializeEventListeners } from './js/systems/InputSystem.js';
+        import { showWarning } from './js/utils/constants.js';
 
         // Initialize game
         const canvas = document.getElementById('gameCanvas');
@@ -39,6 +65,7 @@
 
         // Make game instance available globally for button onclick handlers
         window.game = game;
+        window.showWarning = showWarning;
     </script>
 </body>
 </html>

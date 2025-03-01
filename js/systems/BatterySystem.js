@@ -15,9 +15,14 @@ export class BatterySystem {
                 );
             }
 
-            // Only heal if we have enough energy for at least one complete healing operation (5 energy)
-            const BATCH_ENERGY_COST = 5;
-            if (battery.energy >= BATCH_ENERGY_COST) {
+            // Set minimum energy threshold for healing
+            const MIN_ENERGY_THRESHOLD = 10;
+            
+            // Calculate energy cost based on potential healing targets
+            // More efficient energy use when healing multiple units
+            const ENERGY_PER_UNIT = 1;
+            
+            if (battery.energy >= MIN_ENERGY_THRESHOLD) {
                 let damagedUnits = [];
 
                 // Check base first (highest priority)
@@ -57,9 +62,12 @@ export class BatterySystem {
                     }
                 });
 
-                // Heal units if we have enough energy for all of them
+                // Heal units if we have damaged units to heal
                 if (damagedUnits.length > 0) {
-                    const totalEnergyCost = BATCH_ENERGY_COST;
+                    // Scale energy cost based on number of units, with a minimum cost
+                    const totalEnergyCost = Math.max(MIN_ENERGY_THRESHOLD, damagedUnits.length * ENERGY_PER_UNIT);
+                    
+                    // Full healing mode - use larger amounts of energy for more effective healing
                     if (battery.energy >= totalEnergyCost) {
                         damagedUnits.forEach(unit => {
                             // Handle base healing separately since it's not an Entity
@@ -73,6 +81,24 @@ export class BatterySystem {
                             battery.healingTargets.push(unit);
                         });
                         battery.energy -= totalEnergyCost;
+                    }
+                    // Emergency healing mode - when energy is low, heal less but still provide some healing
+                    else if (battery.energy > 0) {
+                        // Use whatever energy we have left for reduced healing
+                        const emergencyHealAmount = Math.max(1, Math.floor(UNIT_STATS.BATTERY.HEAL_AMOUNT / 2));
+                        damagedUnits.forEach(unit => {
+                            // Handle base healing separately since it's not an Entity
+                            if (unit === game.base) {
+                                unit.hp = Math.min(unit.maxHp, unit.hp + emergencyHealAmount);
+                            } else {
+                                // Heal HP for Entity-based units
+                                unit.heal(emergencyHealAmount);
+                            }
+                            
+                            battery.healingTargets.push(unit);
+                        });
+                        // Use all remaining energy
+                        battery.energy = 0;
                     }
                 }
             }

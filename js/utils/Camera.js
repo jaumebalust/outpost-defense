@@ -8,9 +8,16 @@ export class Camera {
         this.zoom = 1;
         this.worldWidth = 4000; // The total size of the game world
         this.worldHeight = 3000;
-        this.moveSpeed = 100; // Increased from 15 to 30 for faster WASD movement
-        this.edgeScrollThreshold = 100; // Increased from 50 to 150 pixels
+        this.moveSpeed = 20; // Increased for better responsiveness
+        this.edgeScrollThreshold = 100; // Pixels from edge to start scrolling
         this.maxScrollSpeed = 30; // Maximum scroll speed
+        
+        // Smooth movement properties
+        this.velocityX = 0;
+        this.velocityY = 0;
+        this.acceleration = 0.8; // Reduced for smoother acceleration
+        this.friction = 0.92; // Increased for smoother deceleration
+        this.maxVelocity = 25; // Increased for better top speed
         
         // Track pressed keys
         this.pressedKeys = new Set();
@@ -19,6 +26,7 @@ export class Camera {
         this.handleKeyDown = this.handleKeyDown.bind(this);
         this.handleKeyUp = this.handleKeyUp.bind(this);
         this.handleMouseMove = this.handleMouseMove.bind(this);
+        this.update = this.update.bind(this);
         
         // Add event listeners
         window.addEventListener('keydown', this.handleKeyDown);
@@ -35,39 +43,58 @@ export class Camera {
         const key = e.key.toLowerCase();
         if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
             this.pressedKeys.add(key);
-            this.updateCameraPosition();
         }
     }
 
     handleKeyUp(e) {
         const key = e.key.toLowerCase();
         this.pressedKeys.delete(key);
+    }
+
+    // New method to be called every frame from the game loop
+    update() {
         this.updateCameraPosition();
     }
 
     updateCameraPosition() {
-        let dx = 0;
-        let dy = 0;
+        let targetVelocityX = 0;
+        let targetVelocityY = 0;
 
-        // Calculate movement direction
-        if (this.pressedKeys.has('w') || this.pressedKeys.has('arrowup')) dy -= 1;
-        if (this.pressedKeys.has('s') || this.pressedKeys.has('arrowdown')) dy += 1;
-        if (this.pressedKeys.has('a') || this.pressedKeys.has('arrowleft')) dx -= 1;
-        if (this.pressedKeys.has('d') || this.pressedKeys.has('arrowright')) dx += 1;
+        // Calculate target velocity based on pressed keys
+        if (this.pressedKeys.has('w') || this.pressedKeys.has('arrowup')) targetVelocityY -= this.moveSpeed;
+        if (this.pressedKeys.has('s') || this.pressedKeys.has('arrowdown')) targetVelocityY += this.moveSpeed;
+        if (this.pressedKeys.has('a') || this.pressedKeys.has('arrowleft')) targetVelocityX -= this.moveSpeed;
+        if (this.pressedKeys.has('d') || this.pressedKeys.has('arrowright')) targetVelocityX += this.moveSpeed;
 
         // Normalize diagonal movement
-        if (dx !== 0 && dy !== 0) {
-            const length = Math.sqrt(dx * dx + dy * dy);
-            dx = (dx / length) * this.moveSpeed;
-            dy = (dy / length) * this.moveSpeed;
-        } else {
-            dx *= this.moveSpeed;
-            dy *= this.moveSpeed;
+        if (targetVelocityX !== 0 && targetVelocityY !== 0) {
+            const length = Math.sqrt(targetVelocityX * targetVelocityX + targetVelocityY * targetVelocityY);
+            targetVelocityX = (targetVelocityX / length) * this.moveSpeed;
+            targetVelocityY = (targetVelocityY / length) * this.moveSpeed;
         }
 
+        // Smoothly accelerate toward target velocity
+        this.velocityX += (targetVelocityX - this.velocityX) * this.acceleration;
+        this.velocityY += (targetVelocityY - this.velocityY) * this.acceleration;
+
+        // Apply friction when no keys are pressed
+        if (targetVelocityX === 0) this.velocityX *= this.friction;
+        if (targetVelocityY === 0) this.velocityY *= this.friction;
+
+        // Clamp velocity to maximum
+        const currentVelocity = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+        if (currentVelocity > this.maxVelocity) {
+            this.velocityX = (this.velocityX / currentVelocity) * this.maxVelocity;
+            this.velocityY = (this.velocityY / currentVelocity) * this.maxVelocity;
+        }
+
+        // Stop completely if velocity is very small
+        if (Math.abs(this.velocityX) < 0.05) this.velocityX = 0;
+        if (Math.abs(this.velocityY) < 0.05) this.velocityY = 0;
+
         // Apply movement with bounds checking
-        this.x = Math.max(0, Math.min(this.worldWidth - this.game.canvas.width, this.x + dx));
-        this.y = Math.max(0, Math.min(this.worldHeight - this.game.canvas.height, this.y + dy));
+        this.x = Math.max(0, Math.min(this.worldWidth - this.game.canvas.width, this.x + this.velocityX));
+        this.y = Math.max(0, Math.min(this.worldHeight - this.game.canvas.height, this.y + this.velocityY));
     }
 
     handleMouseMove(e) {
@@ -84,7 +111,7 @@ export class Camera {
             return;
         }
 
-        // Check if mouse is in minimap area
+        // Check if mouse is in minimap area (now in bottom-left)
         const isInMinimap = MinimapSystem.isInMinimapBounds(mouseX, mouseY, this.game.canvas.height);
 
         // Calculate scroll speed based on how close to the edge the cursor is
@@ -97,8 +124,8 @@ export class Camera {
         let dx = 0;
         let horizontalSpeed = 0;
         if (mouseX < this.edgeScrollThreshold) {
-            // Only scroll if we're at the very edge or not in minimap area
-            if (mouseX < 5 || !isInMinimap) {
+            // Only scroll if we're not in minimap area or at the very edge
+            if (!isInMinimap || mouseX < 5) {
                 horizontalSpeed = getScrollSpeed(mouseX);
                 dx = -horizontalSpeed;
             }
@@ -113,10 +140,9 @@ export class Camera {
         if (mouseY < this.edgeScrollThreshold) {
             verticalSpeed = getScrollSpeed(mouseY);
             dy = -verticalSpeed;
-        } else if (mouseY > this.game.canvas.height - this.edgeScrollThreshold && 
-                   e.clientY >= window.innerHeight - 5) { // Only scroll down if at bottom of window
-            // Only scroll if we're at the very edge or not in minimap area
-            if (e.clientY >= window.innerHeight - 5 || !isInMinimap) {
+        } else if (mouseY > this.game.canvas.height - this.edgeScrollThreshold) {
+            // Only scroll if we're not in minimap area or at the very edge
+            if (!isInMinimap || mouseY > this.game.canvas.height - 5) {
                 verticalSpeed = getScrollSpeed(this.game.canvas.height - mouseY);
                 dy = verticalSpeed;
             }

@@ -1,5 +1,5 @@
 // Global size multiplier - adjust this to make everything bigger or smaller
-export const SIZE_MULTIPLIER = 1.5;
+export const SIZE_MULTIPLIER = 1.2;
 
 // Scale factors for game elements
 export const SCALE = Math.min(window.innerWidth / 1920, window.innerHeight / 1080) * 2 * SIZE_MULTIPLIER;
@@ -62,10 +62,10 @@ export const UNIT_STATS = {
         HP: 300,
         SIZE: 40,
         RANGE: 250,
-        ENERGY: 400,
-        HEAL_AMOUNT: 1,
+        ENERGY: 800,
+        HEAL_AMOUNT: 3,
         ENERGY_COST: 0.15,
-        ENERGY_REGEN: 0.08
+        ENERGY_REGEN: 0.15
     }
 };
 
