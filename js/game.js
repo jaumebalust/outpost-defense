@@ -535,6 +535,11 @@ export class Game {
         if (window.updateButtonStates) {
             window.updateButtonStates(this);
         }
+        
+        // Check milestones after adding minerals - fix for milestone tracking
+        if (this.milestoneSystem) {
+            this.milestoneSystem.update();
+        }
     }
 
     update(deltaTime) {

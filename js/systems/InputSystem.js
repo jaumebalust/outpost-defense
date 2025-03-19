@@ -578,7 +578,7 @@ function handleSelection(game, screenX, screenY) {
     // Second priority: try to select turrets
     let closestTurret = null;
     let closestTurretDist = Infinity;
-    const turretHitboxSize = 2.5; // Increased hitbox
+    const turretHitboxSize = 1.5; // Reduced from 2.5 for better selection between buildings
     
     game.turrets.forEach(turret => {
         const dist = Math.hypot(worldX - turret.x, worldY - turret.y);
@@ -602,7 +602,7 @@ function handleSelection(game, screenX, screenY) {
     // Third priority: try to select batteries
     let closestBattery = null;
     let closestBatteryDist = Infinity;
-    const batteryHitboxSize = 2.5; // Increased hitbox
+    const batteryHitboxSize = 1.5; // Reduced from 2.5 for better selection between buildings
 
     game.batteries.forEach(battery => {
         const dist = Math.hypot(worldX - battery.x, worldY - battery.y);
@@ -625,7 +625,7 @@ function handleSelection(game, screenX, screenY) {
     // Fourth priority: mineral patches
     let closestMineral = null;
     let closestMineralDist = Infinity;
-    const mineralHitboxSize = 2; // Added hitbox multiplier
+    const mineralHitboxSize = 1.5; // Reduced from 2 for better selection between buildings
 
     game.mineralPatches.forEach(mineral => {
         const dist = Math.hypot(worldX - mineral.x, worldY - mineral.y);
@@ -671,7 +671,7 @@ function handleSelection(game, screenX, screenY) {
     
     // Check missile launchers
     for (const missileLauncher of game.missileLaunchers) {
-        if (Math.hypot(worldX - missileLauncher.x, worldY - missileLauncher.y) < missileLauncher.size + SELECTION_THRESHOLD) {
+        if (Math.hypot(worldX - missileLauncher.x, worldY - missileLauncher.y) < missileLauncher.size * 1.5) {
             missileLauncher.isSelected = true;
             game.selectedMissileLauncher = missileLauncher;
             game.soundSystem.play('select');
