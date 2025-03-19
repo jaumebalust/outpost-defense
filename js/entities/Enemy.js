@@ -20,6 +20,7 @@ export class Enemy extends Entity {
         this.attackY = null;
         this.targetUpdateCooldown = 0;
         this.spawnTime = Date.now();
+        this.id = Math.random().toString(36).substr(2, 9); // Generate unique ID for missile targeting
     }
 
     findTarget(game) {
@@ -66,6 +67,13 @@ export class Enemy extends Entity {
     }
 
     update(game) {
+        // Check if enemy is dead
+        if (this.hp <= 0) {
+            // Remove this enemy from the game
+            game.enemies = game.enemies.filter(e => e !== this);
+            return;
+        }
+        
         // Update cooldowns
         if (this.attackCooldown > 0) {
             this.attackCooldown--;

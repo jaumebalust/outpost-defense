@@ -123,6 +123,8 @@ export class MinimapSystem {
             y <= game.canvas.height - padding) {
             
             console.log('Minimap click detected at:', x, y);
+            console.log('Minimap bounds: x:', padding, 'to', padding + minimapSize, 
+                        'y:', game.canvas.height - minimapSize - padding, 'to', game.canvas.height - padding);
             
             // Convert minimap coordinates to world coordinates
             const scaleX = game.camera.worldWidth / minimapSize;
@@ -134,6 +136,9 @@ export class MinimapSystem {
             console.log('Converted to world coordinates:', worldX, worldY);
             
             // Center the camera on the clicked point
+            const oldCameraX = game.camera.x;
+            const oldCameraY = game.camera.y;
+            
             game.camera.x = Math.max(0, Math.min(
                 game.camera.worldWidth - game.canvas.width / game.camera.zoom,
                 worldX - (game.canvas.width / game.camera.zoom) / 2
@@ -143,17 +148,23 @@ export class MinimapSystem {
                 worldY - (game.canvas.height / game.camera.zoom) / 2
             ));
             
+            console.log('Camera moved from:', oldCameraX, oldCameraY, 'to:', game.camera.x, game.camera.y);
+            
             // Reset camera velocity to prevent drift after clicking
             if (game.camera.velocityX !== undefined) {
                 game.camera.velocityX = 0;
                 game.camera.velocityY = 0;
             }
             
-            console.log('Camera position updated to:', game.camera.x, game.camera.y);
-            return true; // Click was handled
+            // Play click sound for feedback
+            game.soundSystem.play('click');
+            
+            // Return true to indicate the click was handled
+            return true;
         }
         
-        return false; // Click was not on minimap
+        // Click was not in minimap bounds
+        return false;
     }
 
     static isInMinimapBounds(x, y, canvasHeight) {

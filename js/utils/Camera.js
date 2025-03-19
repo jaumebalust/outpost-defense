@@ -8,16 +8,16 @@ export class Camera {
         this.zoom = 1;
         this.worldWidth = 4000; // The total size of the game world
         this.worldHeight = 3000;
-        this.moveSpeed = 20; // Increased for better responsiveness
-        this.edgeScrollThreshold = 100; // Pixels from edge to start scrolling
-        this.maxScrollSpeed = 30; // Maximum scroll speed
+        this.moveSpeed = 18; // Adjusted for better responsiveness
+        this.edgeScrollThreshold = 40; // Smaller threshold for edge scrolling (more like StarCraft)
+        this.maxScrollSpeed = 30; // Adjusted maximum scroll speed
         
         // Smooth movement properties
         this.velocityX = 0;
         this.velocityY = 0;
-        this.acceleration = 0.8; // Reduced for smoother acceleration
-        this.friction = 0.92; // Increased for smoother deceleration
-        this.maxVelocity = 25; // Increased for better top speed
+        this.acceleration = 0.6; // Smoother acceleration
+        this.friction = 0.94; // Smoother deceleration
+        this.maxVelocity = 30; // Match with maxScrollSpeed
         
         // Track pressed keys
         this.pressedKeys = new Set();
@@ -104,15 +104,30 @@ export class Camera {
         const rect = this.game.canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
+        const canvasHeight = this.game.canvas.height;
+        const canvasWidth = this.game.canvas.width;
 
         // Only proceed if mouse is within canvas bounds
-        if (mouseX < 0 || mouseX > this.game.canvas.width || 
-            mouseY < 0 || mouseY > this.game.canvas.height) {
+        if (mouseX < 0 || mouseX > canvasWidth || 
+            mouseY < 0 || mouseY > canvasHeight) {
             return;
         }
 
-        // Check if mouse is in minimap area (now in bottom-left)
-        const isInMinimap = MinimapSystem.isInMinimapBounds(mouseX, mouseY, this.game.canvas.height);
+        // Define UI regions where edge scrolling should be disabled
+        const UI_BOTTOM_HEIGHT = 160; // Height of bottom UI area (info panel + minimap)
+        const MINIMAP_WIDTH = MinimapSystem.MINIMAP_SIZE + MinimapSystem.MINIMAP_PADDING * 2;
+        const ACTION_BUTTONS_WIDTH = 270; // Width of action buttons area on right
+
+        // Check if mouse is in UI areas
+        const isInBottomUI = mouseY > canvasHeight - UI_BOTTOM_HEIGHT;
+        const isInBottomLeftUI = isInBottomUI && mouseX < MINIMAP_WIDTH + 20; // Minimap area
+        const isInBottomRightUI = isInBottomUI && mouseX > canvasWidth - ACTION_BUTTONS_WIDTH; // Action buttons area
+        const isInBottomCenterUI = isInBottomUI && 
+                                  mouseX > (canvasWidth / 2) - 200 && 
+                                  mouseX < (canvasWidth / 2) + 200; // Info panel area
+
+        // Check if mouse is in minimap area (bottom-left)
+        const isInMinimap = MinimapSystem.isInMinimapBounds(mouseX, mouseY, canvasHeight);
 
         // Calculate scroll speed based on how close to the edge the cursor is
         const getScrollSpeed = (distance) => {
@@ -124,14 +139,17 @@ export class Camera {
         let dx = 0;
         let horizontalSpeed = 0;
         if (mouseX < this.edgeScrollThreshold) {
-            // Only scroll if we're not in minimap area or at the very edge
-            if (!isInMinimap || mouseX < 5) {
+            // Only scroll if we're not in UI area
+            if (!isInBottomLeftUI) {
                 horizontalSpeed = getScrollSpeed(mouseX);
                 dx = -horizontalSpeed;
             }
-        } else if (mouseX > this.game.canvas.width - this.edgeScrollThreshold) {
-            horizontalSpeed = getScrollSpeed(this.game.canvas.width - mouseX);
-            dx = horizontalSpeed;
+        } else if (mouseX > canvasWidth - this.edgeScrollThreshold) {
+            // Only scroll if we're not in UI area
+            if (!isInBottomRightUI) {
+                horizontalSpeed = getScrollSpeed(canvasWidth - mouseX);
+                dx = horizontalSpeed;
+            }
         }
 
         // Calculate vertical movement
@@ -140,10 +158,10 @@ export class Camera {
         if (mouseY < this.edgeScrollThreshold) {
             verticalSpeed = getScrollSpeed(mouseY);
             dy = -verticalSpeed;
-        } else if (mouseY > this.game.canvas.height - this.edgeScrollThreshold) {
-            // Only scroll if we're not in minimap area or at the very edge
-            if (!isInMinimap || mouseY > this.game.canvas.height - 5) {
-                verticalSpeed = getScrollSpeed(this.game.canvas.height - mouseY);
+        } else if (mouseY > canvasHeight - this.edgeScrollThreshold) {
+            // Only scroll if we're not in any UI element at the bottom
+            if (!isInBottomLeftUI && !isInBottomRightUI && !isInBottomCenterUI) {
+                verticalSpeed = getScrollSpeed(canvasHeight - mouseY);
                 dy = verticalSpeed;
             }
         }
@@ -157,8 +175,8 @@ export class Camera {
         }
 
         // Apply movement with bounds checking
-        this.x = Math.max(0, Math.min(this.worldWidth - this.game.canvas.width, this.x + dx));
-        this.y = Math.max(0, Math.min(this.worldHeight - this.game.canvas.height, this.y + dy));
+        this.x = Math.max(0, Math.min(this.worldWidth - canvasWidth, this.x + dx));
+        this.y = Math.max(0, Math.min(this.worldHeight - canvasHeight, this.y + dy));
     }
 
     // Convert world coordinates to screen coordinates

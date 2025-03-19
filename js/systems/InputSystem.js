@@ -3,6 +3,8 @@ import { showWarning } from '../utils/constants.js';
 import { Worker } from '../entities/Worker.js';
 import { Turret } from '../entities/Turret.js';
 import { Battery } from '../entities/Battery.js';
+import { MissileLauncher } from '../entities/MissileLauncher.js';
+import { MinimapSystem } from './MinimapSystem.js';
 
 // Selection state
 export const selectionState = {
@@ -24,17 +26,56 @@ export function updateButtonStates(game) {
         const buildWorkerButton = document.getElementById('buildWorkerButton') || document.querySelector('.worker-btn');
         const buildTurretButton = document.getElementById('buildTurretButton') || document.querySelector('.turret-btn');
         const buildBatteryButton = document.getElementById('buildBatteryButton') || document.querySelector('.battery-btn');
+        const buildMissileLauncherButton = document.getElementById('buildMissileLauncherButton') || document.querySelector('.missile-launcher-btn');
+        
+        // Get upgrade buttons
+        const turretUpgradeButton = document.querySelector('#turret-buttons .upgrade-btn');
+        const missileLauncherUpgradeButton = document.querySelector('#missile-launcher-buttons .upgrade-btn');
         
         // Only proceed if buttons exist in the DOM
-        if (!buildWorkerButton || !buildTurretButton || !buildBatteryButton) {
+        if (!buildWorkerButton || !buildTurretButton || !buildBatteryButton || !buildMissileLauncherButton) {
             console.warn('Could not find all building buttons in the DOM');
-            return; // Exit early if any button is not found
+            // Continue anyway, as upgrade buttons may still exist
+        }
+        
+        // Update turret upgrade button if it exists
+        if (turretUpgradeButton && game.selectedTurret) {
+            console.log('Turret upgrade button found and turret selected');
+            const upgradeCost = 150 * Math.pow(2, game.selectedTurret.level - 1);
+            turretUpgradeButton.textContent = `Upgrade (${upgradeCost})`;
+            
+            if (game.minerals >= upgradeCost) {
+                turretUpgradeButton.disabled = false;
+                turretUpgradeButton.classList.remove('disabled');
+            } else {
+                turretUpgradeButton.disabled = true;
+                turretUpgradeButton.classList.add('disabled');
+            }
+        } else {
+            console.log('Turret upgrade button issue:',
+                'Button exists:', !!turretUpgradeButton,
+                'Turret selected:', !!game.selectedTurret);
+        }
+        
+        // Update missile launcher upgrade button if it exists
+        if (missileLauncherUpgradeButton && game.selectedMissileLauncher) {
+            const upgradeCost = 150 * Math.pow(2, game.selectedMissileLauncher.level - 1);
+            missileLauncherUpgradeButton.textContent = `Upgrade (${upgradeCost})`;
+            
+            if (game.minerals >= upgradeCost) {
+                missileLauncherUpgradeButton.disabled = false;
+                missileLauncherUpgradeButton.classList.remove('disabled');
+            } else {
+                missileLauncherUpgradeButton.disabled = true;
+                missileLauncherUpgradeButton.classList.add('disabled');
+            }
         }
         
         // Check if buttons are visible before updating their state
         const isWorkerButtonVisible = buildWorkerButton.style.visibility !== 'hidden';
         const isTurretButtonVisible = buildTurretButton.style.visibility !== 'hidden';
         const isBatteryButtonVisible = buildBatteryButton.style.visibility !== 'hidden';
+        const isMissileLauncherButtonVisible = buildMissileLauncherButton.style.visibility !== 'hidden';
         
         // Only update buttons if they are visible
         if (isWorkerButtonVisible && buildWorkerButton) {
@@ -66,6 +107,16 @@ export function updateButtonStates(game) {
                 buildBatteryButton.classList.add('disabled');
             }
         }
+        
+        if (isMissileLauncherButtonVisible && buildMissileLauncherButton) {
+            if (game.minerals >= COSTS.MISSILE_LAUNCHER) {
+                buildMissileLauncherButton.disabled = false;
+                buildMissileLauncherButton.classList.remove('disabled');
+            } else {
+                buildMissileLauncherButton.disabled = true;
+                buildMissileLauncherButton.classList.add('disabled');
+            }
+        }
     } catch (error) {
         console.error('Error updating button states:', error);
     }
@@ -74,10 +125,17 @@ export function updateButtonStates(game) {
 // Make it available globally
 window.updateButtonStates = updateButtonStates;
 window.controlGroups = controlGroups;
+window.selectionState = selectionState;
 
 export function initializeEventListeners(game) {
     const canvas = game.canvas;
     const floatingUpgradeBtn = document.getElementById('floating-upgrade-btn');
+
+    // Set initial action button visibility
+    const defaultButtons = document.getElementById('default-buttons');
+    if (defaultButtons) {
+        defaultButtons.classList.add('active');
+    }
 
     // Mouse down - Start selection rectangle
     canvas.addEventListener('mousedown', function(e) {
@@ -85,29 +143,46 @@ export function initializeEventListeners(game) {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
+        // Check specifically for minimap click first
+        if (e.button === 0) {  // Left click only
+            const isInMinimap = MinimapSystem.isInMinimapBounds(x, y, canvas.height);
+            
+            if (isInMinimap) {
+                console.log('Minimap click detected in mousedown event');
+                // Handle the minimap click and exit - don't start selection
+                MinimapSystem.handleClick(game, x, y);
+                e.preventDefault(); // Prevent any default behavior
+                e.stopPropagation(); // Stop event from bubbling
+                return;
+            }
+        }
+        
+        // Check if clicking on HTML UI elements
+        // Only proceed with game canvas logic if the target is the canvas itself
+        if (e.target !== canvas) {
+            console.log('Clicked on HTML UI element:', e.target);
+            return; // Don't process canvas interactions for clicks on UI elements
+        }
+        
         // Check if clicking on UI elements by checking coordinates
-        const minimapSize = 200; // From MinimapSystem
-        const minimapPadding = 10;
         const infoPanel = document.getElementById('info-panel');
         const actionButtons = document.getElementById('action-buttons');
         
-        const isInInfoPanel = infoPanel && e.target === canvas && 
+        // Calculate action buttons bounds more precisely
+        const actionButtonsRect = actionButtons ? actionButtons.getBoundingClientRect() : null;
+        const isInActionButtons = actionButtonsRect && 
+            e.clientX >= actionButtonsRect.left && 
+            e.clientX <= actionButtonsRect.right && 
+            e.clientY >= actionButtonsRect.top && 
+            e.clientY <= actionButtonsRect.bottom;
+        
+        const isInInfoPanel = infoPanel && 
             x >= (canvas.width / 2) - 200 && 
             x <= (canvas.width / 2) + 200 && 
             y >= canvas.height - 150;
         
-        const isInActionButtons = actionButtons && e.target === canvas && 
-            x >= canvas.width - 300 && 
-            x <= canvas.width && 
-            y >= canvas.height - 300;
-            
-        const isInMinimap = e.target === canvas && 
-            x >= minimapPadding && 
-            x <= minimapPadding + minimapSize && 
-            y >= canvas.height - minimapSize - minimapPadding && 
-            y <= canvas.height - minimapPadding;
-            
-        if (isInInfoPanel || isInActionButtons || isInMinimap) {
+        if (isInInfoPanel || isInActionButtons) {
+            console.log('Click on UI element detected:', isInInfoPanel ? 'info panel' : 'action buttons');
             return; // Don't start selection if clicking on UI
         }
 
@@ -116,6 +191,7 @@ export function initializeEventListeners(game) {
             selectionState.isSelecting = true;
             selectionState.start = { x, y };
             selectionState.end = { x, y };
+            console.log('Selection started at', x, y);
         }
     });
 
@@ -127,6 +203,10 @@ export function initializeEventListeners(game) {
                 x: e.clientX - rect.left,
                 y: e.clientY - rect.top
             };
+            console.log('Selection rectangle updated:', 
+                'start:', selectionState.start, 
+                'end:', selectionState.end, 
+                'isSelecting:', selectionState.isSelecting);
         }
     });
 
@@ -135,6 +215,36 @@ export function initializeEventListeners(game) {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
+        
+        // Don't process canvas interactions for clicks on UI elements
+        if (e.target !== canvas) {
+            console.log('Mouse up on HTML UI element:', e.target);
+            selectionState.isSelecting = false; // End any selection in progress
+            return;
+        }
+        
+        // Check for action buttons using getBoundingClientRect for more precise detection
+        const actionButtons = document.getElementById('action-buttons');
+        const actionButtonsRect = actionButtons ? actionButtons.getBoundingClientRect() : null;
+        const isInActionButtons = actionButtonsRect && 
+            e.clientX >= actionButtonsRect.left && 
+            e.clientX <= actionButtonsRect.right && 
+            e.clientY >= actionButtonsRect.top && 
+            e.clientY <= actionButtonsRect.bottom;
+        
+        if (isInActionButtons) {
+            console.log('Mouse up on action buttons');
+            selectionState.isSelecting = false; // End any selection in progress
+            return;
+        }
+        
+        // Check if clicking on minimap - don't handle as a regular click
+        if (e.button === 0 && MinimapSystem.isInMinimapBounds(x, y, canvas.height)) {
+            // If the click started and ended on the minimap, it's already being handled
+            // If selection in progress, just end it without taking action
+            selectionState.isSelecting = false;
+            return;
+        }
         
         // Handle building placement on left click
         if (e.button === 0 && game.buildingType) {
@@ -153,7 +263,7 @@ export function initializeEventListeners(game) {
             );
             
             if (dragDistance < 10) {
-                // Treat as click if dragged less than 10 pixels
+                // Treat as regular selection click
                 handleClick(game, x, y);
             } else {
                 // Handle rectangle selection
@@ -186,6 +296,9 @@ export function initializeEventListeners(game) {
                 break;
             case 'b': // 'b' for battery instead of 's'
                 toggleBuilding(game, 'battery');
+                break;
+            case 'm': // 'm' for missile launcher
+                toggleBuilding(game, 'missile_launcher');
                 break;
             case 'escape':
                 // Cancel rectangle selection if active
@@ -220,6 +333,14 @@ export function initializeEventListeners(game) {
                 }
                 
                 showWarning('Selection cleared');
+                
+                // Update UI to reflect that nothing is selected
+                if (window.UISystem) {
+                    window.UISystem.updateInfoPanel(game);
+                }
+                
+                // Update action buttons visibility
+                updateActionButtonsVisibility(game);
                 break;
         }
     });
@@ -249,12 +370,43 @@ export function initializeEventListeners(game) {
             e.preventDefault();
             return;
         }
+        
+        // Handle turret upgrade with 'U' key
+        if (key.toLowerCase() === 'u') {
+            console.log('Upgrade key pressed');
+            upgradeTurret(game);
+            e.preventDefault();
+            return;
+        }
     });
 
     // Define building functions
     game.buildWorker = () => {
         console.log('buildWorker called');
-        toggleBuilding(game, 'worker');
+        // Special handling for workers - build immediately instead of entering building mode
+        
+        // Check if we have enough minerals
+        if (game.minerals < COSTS.WORKER) {
+            showWarning(`Not enough minerals! Need ${COSTS.WORKER}, have ${game.minerals}`);
+            return;
+        }
+        
+        // Workers spawn at the Command Center and don't need placement
+        // Create worker and assign it to the default mineral patch
+        const mineralPatch = game.base.defaultMineralPatch;
+        
+        if (!mineralPatch) {
+            // If no default mineral patch, find the closest one
+            const closestPatch = findClosestMineralPatch(game, game.base.x, game.base.y);
+            if (!closestPatch) {
+                showWarning('No mineral patches available!');
+                return;
+            }
+            
+            buildWorker(game, closestPatch);
+        } else {
+            buildWorker(game, mineralPatch);
+        }
     };
     
     game.buildTurret = () => {
@@ -267,6 +419,11 @@ export function initializeEventListeners(game) {
         toggleBuilding(game, 'battery');
     };
     
+    game.buildMissileLauncher = () => {
+        console.log('buildMissileLauncher called');
+        toggleBuilding(game, 'missile_launcher');
+    };
+    
     game.upgradeTurret = () => upgradeTurret(game);
 
     // Make sure these methods are also available on the window.game object
@@ -274,6 +431,7 @@ export function initializeEventListeners(game) {
         window.game.buildWorker = game.buildWorker;
         window.game.buildTurret = game.buildTurret;
         window.game.buildBattery = game.buildBattery;
+        window.game.buildMissileLauncher = game.buildMissileLauncher;
         window.game.upgradeTurret = game.upgradeTurret;
     }
 
@@ -285,104 +443,56 @@ export function initializeEventListeners(game) {
     }
 }
 
-function toggleBuilding(game, type) {
+export function toggleBuilding(game, type) {
     console.log('toggleBuilding called with type:', type, 'Selected base:', game.selectedBase);
     
-    // Get the cost based on building type
-    let cost;
-    switch (type) {
-        case 'worker':
-            cost = COSTS.WORKER;
-            // For workers, we'll auto-select the base if it's not already selected
-            if (!game.selectedBase) {
-                console.log('Auto-selecting base for worker creation');
-                game.selectedBase = game.base;
-            }
-            console.log('Base is selected, proceeding with worker creation');
-            break;
-        case 'turret':
-            cost = COSTS.TURRET;
-            // For turrets, we'll check if any worker is selected
-            if (!game.workers.some(w => w.isSelected) && !game.selectedWorker) {
-                // Auto-select a worker if available
-                if (game.workers.length > 0) {
-                    game.selectedWorker = game.workers[0];
-                    game.selectedWorker.isSelected = true;
-                    console.log('Auto-selected a worker for turret building');
-                } else {
-                    showWarning('No workers available to build turrets');
-                    return;
-                }
-            }
-            console.log('Worker is selected, proceeding with turret building mode');
-            break;
-        case 'battery':
-            cost = COSTS.BATTERY;
-            // For batteries, we'll check if any worker is selected
-            if (!game.workers.some(w => w.isSelected) && !game.selectedWorker) {
-                // Auto-select a worker if available
-                if (game.workers.length > 0) {
-                    game.selectedWorker = game.workers[0];
-                    game.selectedWorker.isSelected = true;
-                    console.log('Auto-selected a worker for battery building');
-                } else {
-                    showWarning('No workers available to build batteries');
-                    return;
-                }
-            }
-            console.log('Worker is selected, proceeding with battery building mode');
-            break;
-        default:
-            showWarning('Unknown building type');
+    // Normalize the type to uppercase for consistency
+    type = type.toUpperCase();
+    
+    // Special handling for workers - they don't need placement
+    if (type === 'WORKER') {
+        // Check if we have enough minerals
+        if (game.minerals < COSTS.WORKER) {
+            showWarning(`Not enough minerals! Need ${COSTS.WORKER}, have ${game.minerals}`);
             return;
-    }
-
-    // Check if we have enough minerals
-    if (game.minerals < cost) {
-        showWarning(`Not enough minerals! Need ${cost}`);
-        return;
-    }
-
-    // Special case for worker: build immediately since the base is already selected
-    if (type === 'worker') {
-        // Use the base's default mineral patch
-        if (!game.base.defaultMineralPatch) {
-            // Find a mineral patch if none set
-            let closestPatch = findClosestMineralPatch(game, game.base.x, game.base.y);
-            if (!closestPatch) {
-                showWarning('No mineral patches available!');
-                return;
-            }
-            game.base.defaultMineralPatch = closestPatch;
         }
         
-        // Make sure the mineral patch exists and has minerals
-        if (!game.base.defaultMineralPatch || game.base.defaultMineralPatch.minerals <= 0) {
-            // Try to find another mineral patch
-            let closestPatch = findClosestMineralPatch(game, game.base.x, game.base.y);
-            if (!closestPatch) {
-                showWarning('No mineral patches available!');
-                return;
-            }
-            game.base.defaultMineralPatch = closestPatch;
+        // Get default or closest mineral patch
+        const mineralPatch = game.base.defaultMineralPatch || findClosestMineralPatch(game, game.base.x, game.base.y);
+        
+        if (!mineralPatch) {
+            showWarning('No mineral patches available!');
+            return;
         }
         
-        buildWorker(game, game.base.defaultMineralPatch);
+        // Build worker directly
+        buildWorker(game, mineralPatch);
         return;
     }
-
-    // For turrets and batteries, enter building mode
+    
+    // Regular building mode toggle for other building types
     if (game.buildingType === type) {
-        // Toggle off if already in this building mode
         game.buildingType = null;
-        showWarning('Building mode cancelled');
+        showWarning('Building cancelled');
     } else {
-        // Toggle on building mode
+        // Check if we have enough minerals
+        const cost = COSTS[type];
+        if (game.minerals < cost) {
+            showWarning(`Not enough minerals! Need ${cost}, have ${game.minerals}`);
+            return;
+        }
+        
         game.buildingType = type;
-        showWarning(`Select location to build ${type}`);
+        showWarning(`Select location for ${type}`);
+        
+        // Auto-select base if no builder is selected
+        if (!game.selectedBase && !game.selectedWorker) {
+            game.selectedBase = game.base;
+            game.base.isSelected = true;
+            showWarning('Base selected as builder');
+        }
     }
-
-    // Update button states to reflect building mode - with try-catch for safety
+    
     try {
         updateButtonStates(game);
     } catch (err) {
@@ -395,6 +505,8 @@ function handleClick(game, x, y) {
         resetGame(game);
         return;
     }
+
+    // Minimap clicks are now handled in the mousedown event, so no need to check here
 
     // If we have a selected entity, we might want to handle actions
     if (game.selectedTurret || game.selectedBattery || game.selectedBase || game.selectedWorker) {
@@ -420,7 +532,7 @@ function handleClick(game, x, y) {
     handleSelection(game, x, y);
 }
 
-function handleSelection(game, x, y) {
+function handleSelection(game, screenX, screenY) {
     // Hide floating upgrade button - we'll use the action panel now
     const floatingUpgradeBtn = document.getElementById('floating-upgrade-btn');
     if (floatingUpgradeBtn) {
@@ -428,18 +540,27 @@ function handleSelection(game, x, y) {
     }
     
     // Convert screen coordinates to world coordinates
-    const worldPos = game.camera.screenToWorld(x, y);
+    const worldPos = game.camera.screenToWorld(screenX, screenY);
     const worldX = worldPos.x;
     const worldY = worldPos.y;
     
-    // Clear all selections first
+    // Check if clicking near any selectable unit using world coordinates
+    const SELECTION_THRESHOLD = 20; // Pixels
+    
+    // Clear previous selection
     game.selectedTurret = null;
     game.selectedBattery = null;
-    game.selectedBase = null;
     game.selectedWorker = null;
+    game.selectedBase = null;
     game.selectedMineralPatch = null;
     game.selectedEnemy = null;
+    game.selectedMissileLauncher = null;
+    
+    // Reset selection state for all entities
     game.workers.forEach(worker => worker.isSelected = false);
+    game.turrets.forEach(turret => turret.isSelected = false);
+    game.batteries.forEach(battery => battery.isSelected = false);
+    game.missileLaunchers.forEach(missileLauncher => missileLauncher.isSelected = false);
     
     // First priority: try to select base if clicked near it
     const baseHitboxSize = 2; // Increased hitbox size for easier selection
@@ -447,8 +568,10 @@ function handleSelection(game, x, y) {
 
     if (distToBase < game.base.size * baseHitboxSize) {
         game.selectedBase = game.base;
+        game.base.isSelected = true;
         console.log('Base selected:', game.selectedBase, 'Distance:', distToBase, 'Base size:', game.base.size);
-        showWarning('Selected Command Center');
+        
+        updateActionButtonsVisibility(game);
         return;
     }
     
@@ -470,7 +593,9 @@ function handleSelection(game, x, y) {
     
     if (closestTurret) {
         game.selectedTurret = closestTurret;
+        closestTurret.isSelected = true;
         showWarning(`Selected Turret (Level ${closestTurret.level})`);
+        updateActionButtonsVisibility(game);
         return;
     }
     
@@ -493,6 +618,7 @@ function handleSelection(game, x, y) {
     if (closestBattery) {
         game.selectedBattery = closestBattery;
         showWarning('Selected Shield Battery');
+        updateActionButtonsVisibility(game);
         return;
     }
     
@@ -516,6 +642,7 @@ function handleSelection(game, x, y) {
         game.selectedMineralPatch = closestMineral;
         closestMineral.isSelected = true;
         showWarning('Selected Mineral Patch');
+        updateActionButtonsVisibility(game);
         return;
     }
     
@@ -538,7 +665,26 @@ function handleSelection(game, x, y) {
     if (closestEnemy) {
         game.selectedEnemy = closestEnemy;
         showWarning(`Selected ${closestEnemy.type} enemy`);
+        updateActionButtonsVisibility(game);
         return;
+    }
+    
+    // Check missile launchers
+    for (const missileLauncher of game.missileLaunchers) {
+        if (Math.hypot(worldX - missileLauncher.x, worldY - missileLauncher.y) < missileLauncher.size + SELECTION_THRESHOLD) {
+            missileLauncher.isSelected = true;
+            game.selectedMissileLauncher = missileLauncher;
+            game.soundSystem.play('select');
+            showWarning('Missile Launcher selected');
+            
+            // Update UI
+            if (window.UISystem) {
+                window.UISystem.updateInfoPanel(game);
+            }
+            
+            updateActionButtonsVisibility(game);
+            return;
+        }
     }
     
     // Next priority: try to select workers within hitbox
@@ -560,7 +706,6 @@ function handleSelection(game, x, y) {
     if (closestWorker) {
         closestWorker.isSelected = true;
         game.selectedWorker = closestWorker;
-        showWarning('Selected worker');
         
         // Make sure the UI is updated to show build options
         try {
@@ -572,82 +717,41 @@ function handleSelection(game, x, y) {
             console.warn('Could not update UI after worker selection', err);
         }
         
+        updateActionButtonsVisibility(game);
         return;
     }
     
     // Nothing selected
     showWarning('Nothing selected');
+    updateActionButtonsVisibility(game);
 }
 
 function handleBuilding(game, screenX, screenY) {
-    console.log('handleBuilding called with buildingType:', game.buildingType);
-    
-    // Get the cost based on building type
-    let cost;
-    switch (game.buildingType) {
-        case 'turret':
-            cost = COSTS.TURRET;
-            break;
-        case 'battery':
-            cost = COSTS.BATTERY;
-            break;
-        default:
-            console.warn('Unknown building type:', game.buildingType);
-            return;
+    // Workers are now built immediately without placement, so skip if worker type
+    if (game.buildingType === 'WORKER') {
+        console.log('Workers do not use placement mode - this should not happen');
+        game.buildingType = null;
+        updateButtonStates(game);
+        return;
     }
     
+    // Convert screen coordinates to world coordinates
+    const worldPos = game.camera.screenToWorld(screenX, screenY);
+    const worldX = worldPos.x;
+    const worldY = worldPos.y;
+    
+    console.log('Building at world position:', worldX, worldY);
+    
+    // Check if we have enough minerals
+    const cost = COSTS[game.buildingType];
     if (game.minerals < cost) {
         showWarning(`Not enough minerals! Need ${cost}`);
         game.buildingType = null;
         updateButtonStates(game);
         return;
     }
-
-    // Convert screen coordinates to world coordinates
-    const worldPos = game.camera.screenToWorld(screenX, screenY);
-    const worldX = worldPos.x;
-    const worldY = worldPos.y;
-
-    // Check if the placement position is within world bounds
-    const margin = 50; // Margin from world edges
-    if (worldX < margin || worldX > game.camera.worldWidth - margin ||
-        worldY < margin || worldY > game.camera.worldHeight - margin) {
-        showWarning('Cannot build outside the game world!');
-        return;
-    }
-
-    // Check if clicking near any selectable unit using world coordinates
-    const SELECTION_THRESHOLD = 0; // Pixels
-    let nearbyUnit = false;
-
-    // Check workers
-    game.workers.forEach(worker => {
-        if (Math.hypot(worldX - worker.x, worldY - worker.y) < worker.size + SELECTION_THRESHOLD) {
-            nearbyUnit = true;
-        }
-    });
-
-    // Check turrets
-    game.turrets.forEach(turret => {
-        if (Math.hypot(worldX - turret.x, worldY - turret.y) < turret.size + SELECTION_THRESHOLD) {
-            nearbyUnit = true;
-        }
-    });
-
-    // Check batteries
-    game.batteries.forEach(battery => {
-        if (Math.hypot(worldX - battery.x, worldY - battery.y) < battery.size + SELECTION_THRESHOLD) {
-            nearbyUnit = true;
-        }
-    });
-
-    // If clicked near a unit, don't build
-    if (nearbyUnit) {
-        console.log('Cannot build: clicked near an existing unit');
-        return;
-    }
-
-    // Get a worker to build the structure
+    
+    // Find a builder (worker or base)
     let builder = null;
     
     // First check if we have a single selected worker
@@ -674,30 +778,47 @@ function handleBuilding(game, screenX, screenY) {
     console.log('Proceeding with building at position:', worldX, worldY, 'with builder:', builder);
     
     // Proceed with building using world coordinates
-    if (game.buildingType === 'battery') {
+    if (game.buildingType === 'BATTERY') {
         buildBattery(game, worldX, worldY, builder);
+    } else if (game.buildingType === 'MISSILE_LAUNCHER') {
+        buildMissileLauncher(game, worldX, worldY, builder);
     } else {
         buildTurret(game, worldX, worldY, builder);
     }
 }
 
-function upgradeTurret(game) {
-    if (!game.selectedTurret) {
-        showWarning('Select a turret to upgrade');
+export function upgradeTurret(game) {
+    if (game.selectedTurret) {
+        const turret = game.selectedTurret;
+        const cost = 150 * Math.pow(2, turret.level - 1);
+        
+        if (game.minerals < cost) {
+            showWarning(`Not enough minerals! Need ${cost}`);
+            return;
+        }
+
+        game.minerals -= cost;
+        turret.upgrade();
+        showWarning(`Turret upgraded to level ${turret.level}!`);
         return;
     }
-
-    const turret = game.selectedTurret;
-    const cost = 150 * Math.pow(2, turret.level - 1);
     
-    if (game.minerals < cost) {
-        showWarning(`Not enough minerals! Need ${cost}`);
+    if (game.selectedMissileLauncher) {
+        const missileLauncher = game.selectedMissileLauncher;
+        const cost = 150 * Math.pow(2, missileLauncher.level - 1);
+        
+        if (game.minerals < cost) {
+            showWarning(`Not enough minerals! Need ${cost}`);
+            return;
+        }
+
+        game.minerals -= cost;
+        missileLauncher.upgrade();
+        showWarning(`Missile Launcher upgraded to level ${missileLauncher.level}!`);
         return;
     }
 
-    game.minerals -= cost;
-    turret.upgrade();
-    showWarning(`Turret upgraded to level ${turret.level}!`);
+    showWarning('Select a turret or missile launcher to upgrade');
 }
 
 function resetGame(game) {
@@ -811,9 +932,33 @@ function buildBattery(game, worldX, worldY, builder) {
     }
 }
 
+function buildMissileLauncher(game, worldX, worldY, builder) {
+    // Create a new missile launcher at the specified location
+    const missileLauncher = new MissileLauncher(game, worldX, worldY);
+    game.missileLaunchers.push(missileLauncher);
+    
+    // Deduct the cost
+    game.minerals -= COSTS.MISSILE_LAUNCHER;
+    
+    // Reset building mode
+    game.buildingType = null;
+    
+    // Play build sound
+    if (game.soundSystem) {
+        game.soundSystem.play('build-missile-launcher');
+    }
+    
+    // Update button states
+    if (typeof updateButtonStates === 'function') {
+        updateButtonStates(game);
+    }
+}
+
 // Add function to draw selection rectangle
 export function drawSelectionRectangle(ctx) {
     if (selectionState.isSelecting) {
+        console.log('Drawing selection rectangle:', selectionState);
+        
         ctx.save();
         ctx.strokeStyle = '#4a9eff';
         ctx.lineWidth = 2;
@@ -864,6 +1009,7 @@ function handleRectangleSelection(game) {
     
     // Clear previous selections
     game.workers.forEach(worker => worker.isSelected = false);
+    game.enemies.forEach(enemy => enemy.isSelected = false);
     game.selectedWorker = null;
     game.selectedTurret = null;
     game.selectedBattery = null;
@@ -883,15 +1029,31 @@ function handleRectangleSelection(game) {
         );
     });
     
+    // Select enemies that are within the rectangle
+    const selectedEnemies = game.enemies.filter(enemy => {
+        // Add a small buffer around enemy position for easier selection
+        const buffer = enemy.size / 2;
+        return (
+            enemy.x - buffer >= left && 
+            enemy.x + buffer <= right && 
+            enemy.y - buffer >= top && 
+            enemy.y + buffer <= bottom
+        );
+    });
+    
     // Mark all selected workers
     selectedWorkers.forEach(worker => {
         worker.isSelected = true;
     });
     
+    // Mark all selected enemies
+    selectedEnemies.forEach(enemy => {
+        enemy.isSelected = true;
+    });
+    
     if (selectedWorkers.length > 0) {
         // Set the first selected worker as the primary selected worker
         game.selectedWorker = selectedWorkers[0];
-        showWarning(`Selected ${selectedWorkers.length} workers`);
         
         // Make sure the UI is updated to show build options
         try {
@@ -902,9 +1064,32 @@ function handleRectangleSelection(game) {
         } catch (err) {
             console.warn('Could not update UI after worker selection', err);
         }
-    } else {
-        showWarning('Nothing selected');
+        
+        // Update action buttons visibility for worker selection
+        updateActionButtonsVisibility(game);
+        return;
     }
+    
+    if (selectedEnemies.length > 0) {
+        // Set the first selected enemy as the primary selected enemy
+        game.selectedEnemy = selectedEnemies[0];
+        
+        // Make sure the UI is updated to show enemy information
+        try {
+            if (window.UISystem) {
+                window.UISystem.updateInfoPanel(game);
+            }
+        } catch (err) {
+            console.warn('Could not update UI after enemy selection', err);
+        }
+        
+        showWarning(`Selected ${selectedEnemies.length} ${selectedEnemies.length > 1 ? 'enemies' : 'enemy'}`);
+        updateActionButtonsVisibility(game);
+        return;
+    }
+    
+    showWarning('Nothing selected');
+    updateActionButtonsVisibility(game);
 }
 
 function handleRightClick(game, screenX, screenY) {
@@ -999,6 +1184,28 @@ function assignToControlGroup(game, groupNumber) {
         });
         assigned = true;
     }
+
+    // Enemies
+    const selectedEnemies = game.enemies.filter(enemy => enemy.isSelected);
+    if (selectedEnemies.length > 0 || game.selectedEnemy) {
+        if (game.selectedEnemy) {
+            controlGroups[groupNumber].push({
+                type: 'enemy',
+                entity: game.selectedEnemy
+            });
+            assigned = true;
+        }
+        
+        selectedEnemies.forEach(enemy => {
+            if (enemy !== game.selectedEnemy) {
+                controlGroups[groupNumber].push({
+                    type: 'enemy',
+                    entity: enemy
+                });
+            }
+        });
+        assigned = assigned || selectedEnemies.length > 0;
+    }
     
     if (assigned) {
         const count = controlGroups[groupNumber].length;
@@ -1023,10 +1230,12 @@ function selectControlGroup(game, groupNumber) {
     // Clear all current selections
     game.mineralPatches.forEach(patch => patch.isSelected = false);
     game.workers.forEach(worker => worker.isSelected = false);
+    game.enemies.forEach(enemy => enemy.isSelected = false);
     game.selectedWorker = null;
     game.selectedTurret = null;
     game.selectedBattery = null;
     game.selectedBase = null;
+    game.selectedEnemy = null;
     
     // Select all entities in the group
     let selectedCount = 0;
@@ -1039,6 +1248,7 @@ function selectControlGroup(game, groupNumber) {
             case 'base':
                 if (game.base === item.entity) {
                     game.selectedBase = item.entity;
+                    game.base.isSelected = true;
                     entityExists = true;
                 }
                 break;
@@ -1067,6 +1277,17 @@ function selectControlGroup(game, groupNumber) {
                     entityExists = true;
                 }
                 break;
+
+            case 'enemy':
+                if (game.enemies.includes(item.entity)) {
+                    item.entity.isSelected = true;
+                    // If this is the first enemy, set it as the primary selected enemy
+                    if (!game.selectedEnemy) {
+                        game.selectedEnemy = item.entity;
+                    }
+                    entityExists = true;
+                }
+                break;
         }
         
         if (entityExists) {
@@ -1085,30 +1306,135 @@ function selectControlGroup(game, groupNumber) {
                 return game.turrets.includes(item.entity);
             case 'battery':
                 return game.batteries.includes(item.entity);
+            case 'enemy':
+                return game.enemies.includes(item.entity);
             default:
                 return false;
         }
     });
     
-    if (selectedCount > 0) {
-        const entityType = selectedCount === 1 ? 
-            controlGroups[groupNumber][0].type.charAt(0).toUpperCase() + 
-            controlGroups[groupNumber][0].type.slice(1) : 
-            'units';
-            
-        showWarning(`Group ${groupNumber}: ${selectedCount} ${entityType} selected`);
-        game.soundSystem.play('click');
-        
-        // Update UI to reflect the new selection
-        if (window.UISystem) {
-            window.UISystem.updateInfoPanel(game);
-        }
-    } else {
-        // If all entities in the group are gone, clear the group
-        controlGroups[groupNumber] = [];
+    // If no entities left in this group, return
+    if (selectedCount === 0) {
+        showWarning(`Control group ${groupNumber} is empty`);
+        return;
     }
+    
+    // Update UI
+    if (window.UISystem) {
+        window.UISystem.updateInfoPanel(game);
+    }
+    
+    // Update action buttons visibility based on the new selection
+    updateActionButtonsVisibility(game);
+    
+    // Play sound and show warning
+    game.soundSystem.play('select');
+    showWarning(`Selected ${selectedCount} units from group ${groupNumber}`);
 }
 
 // Expose control group functions to the window object
 window.assignToControlGroup = assignToControlGroup;
-window.selectControlGroup = selectControlGroup; 
+window.selectControlGroup = selectControlGroup;
+
+export function createButtons() {
+    const buttons = [
+        {
+            id: 'worker-button',
+            x: 10,
+            y: window.innerHeight - 60,
+            width: 50,
+            height: 50,
+            text: 'W',
+            tooltip: 'Build Worker (50)',
+            action: () => toggleBuilding('WORKER'),
+            isActive: () => game.buildingType === 'WORKER',
+            isEnabled: () => game.minerals >= COSTS.WORKER
+        },
+        {
+            id: 'turret-button',
+            x: 70,
+            y: window.innerHeight - 60,
+            width: 50,
+            height: 50,
+            text: 'T',
+            tooltip: 'Build Turret (100)',
+            action: () => toggleBuilding('TURRET'),
+            isActive: () => game.buildingType === 'TURRET',
+            isEnabled: () => game.minerals >= COSTS.TURRET
+        },
+        {
+            id: 'battery-button',
+            x: 130,
+            y: window.innerHeight - 60,
+            width: 50,
+            height: 50,
+            text: 'B',
+            tooltip: 'Build Battery (150)',
+            action: () => toggleBuilding('BATTERY'),
+            isActive: () => game.buildingType === 'BATTERY',
+            isEnabled: () => game.minerals >= COSTS.BATTERY
+        },
+        {
+            id: 'missile-launcher-button',
+            x: 190,
+            y: window.innerHeight - 60,
+            width: 50,
+            height: 50,
+            text: 'M',
+            tooltip: 'Build Missile Launcher (200)',
+            action: () => toggleBuilding('MISSILE_LAUNCHER'),
+            isActive: () => game.buildingType === 'MISSILE_LAUNCHER',
+            isEnabled: () => game.minerals >= COSTS.MISSILE_LAUNCHER
+        },
+        // ... existing buttons ...
+    ];
+    
+    // ... existing code ...
+}
+
+// Add this function to update action button visibility based on selection
+function updateActionButtonsVisibility(game) {
+    // Get all button groups
+    const commandCenterButtons = document.getElementById('command-center-buttons');
+    const workerButtons = document.getElementById('worker-buttons');
+    const defaultButtons = document.getElementById('default-buttons');
+    const turretButtons = document.getElementById('turret-buttons');
+    const missileLauncherButtons = document.getElementById('missile-launcher-buttons');
+    
+    // Debug element existence
+    console.log('Turret buttons element found:', turretButtons ? 'Yes' : 'No');
+    console.log('Selected turret:', game.selectedTurret);
+    console.log('Turret isSelected:', game.selectedTurret ? game.selectedTurret.isSelected : false);
+    
+    // Remove active class from all button groups
+    if (commandCenterButtons) commandCenterButtons.classList.remove('active');
+    if (workerButtons) workerButtons.classList.remove('active');
+    if (defaultButtons) defaultButtons.classList.remove('active');
+    if (turretButtons) turretButtons.classList.remove('active');
+    if (missileLauncherButtons) missileLauncherButtons.classList.remove('active');
+    
+    // Show appropriate button group based on selection
+    if (game.selectedBase && game.selectedBase.isSelected) {
+        // Command Center is selected - show worker build button
+        if (commandCenterButtons) commandCenterButtons.classList.add('active');
+    } else if (game.selectedWorker && game.selectedWorker.isSelected) {
+        // Worker is selected - show building buttons
+        if (workerButtons) workerButtons.classList.add('active');
+    } else if (game.selectedTurret && game.selectedTurret.isSelected) {
+        // Turret is selected - show upgrade button
+        if (turretButtons) turretButtons.classList.add('active');
+    } else if (game.selectedMissileLauncher && game.selectedMissileLauncher.isSelected) {
+        // Missile Launcher is selected - show upgrade button
+        if (missileLauncherButtons) missileLauncherButtons.classList.add('active');
+    } else {
+        // Nothing relevant selected - show empty buttons
+        if (defaultButtons) defaultButtons.classList.add('active');
+    }
+    
+    // Update button states (enabled/disabled) based on mineral availability
+    try {
+        updateButtonStates(game);
+    } catch (err) {
+        console.warn('Could not update button states', err);
+    }
+} 

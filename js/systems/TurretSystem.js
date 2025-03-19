@@ -1,4 +1,4 @@
-import { calculateAngle } from '../utils/constants.js';
+import { calculateAngle } from '../utils/math.js';
 import { Missile } from '../entities/Missile.js';
 
 export class TurretSystem {

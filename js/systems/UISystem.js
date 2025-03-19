@@ -1,4 +1,4 @@
-import { COSTS, UNIT_STATS } from '../utils/constants.js';
+import { COSTS, UNIT_STATS, COMBAT, SCALE } from '../utils/constants.js';
 import { MilestoneSystem } from './MilestoneSystem.js';
 
 export class UISystem {
@@ -18,8 +18,11 @@ export class UISystem {
         // Draw wave info
         UISystem.drawWaveInfo(ctx, game);
 
+        // Draw control group indicators
+        UISystem.drawControlGroupIndicators(ctx, game);
+
         // Draw warning message if exists
-        UISystem.drawWarningMessage(ctx, game);
+        UISystem.drawWarningMessage(game);
         
         // Update info panel with selected entity details
         UISystem.updateInfoPanel(game);
@@ -28,9 +31,6 @@ export class UISystem {
         if (game.gameOver) {
             UISystem.drawEndScreen(ctx, game);
         }
-        
-        // Draw control group indicators
-        UISystem.drawControlGroupIndicators(ctx, game);
     }
 
     static drawHUDBackground(ctx, game, isResourcePanel) {
@@ -100,7 +100,7 @@ export class UISystem {
         ctx.fillStyle = '#4DB6FF';
         ctx.font = 'bold 20px "Orbitron", sans-serif';
         const mineralsLabel = 'MINERALS';
-        const mineralsLabelX = PANEL_X + PANEL_PADDING + 100
+        const mineralsLabelX = PANEL_X + PANEL_PADDING + (15 * (SCALE / 2));
         ctx.fillText(mineralsLabel, mineralsLabelX, 45);
         
         // Draw crystal icon on the right side
@@ -113,14 +113,7 @@ export class UISystem {
         const mineralsX = mineralsLabelX;
         ctx.fillText(mineralsText, mineralsX, 80);
         
-        // Draw collection rate indicator with proper spacing
-        ctx.fillStyle = '#45A5F5';
-        ctx.font = '14px "Orbitron", sans-serif';
-        const collectionRate = game.workers.length * 10;
-        const rateText = `+${collectionRate}/min`;
-        const mineralsMetrics = ctx.measureText(mineralsText);
-        const rateX = mineralsX + mineralsMetrics.width + 100;
-        ctx.fillText(rateText, rateX, 80);
+
     }
 
     static drawMilestonePanel(ctx, game) {
@@ -149,7 +142,7 @@ export class UISystem {
         ctx.fillStyle = '#FFD700';
         ctx.font = 'bold 20px "Orbitron", sans-serif';
         const phaseName = currentPhase.name;
-        const phaseNameX = PANEL_X + PANEL_PADDING +100;
+        const phaseNameX = PANEL_X + PANEL_PADDING + (15 * (SCALE / 2));
         ctx.fillText(phaseName, phaseNameX, baseY);
         
         // Draw goals with checkboxes
@@ -172,7 +165,7 @@ export class UISystem {
             // Draw goal text with proper spacing and wrapping
             ctx.fillStyle = completed ? '#4CAF50' : '#7FDBFF';
             ctx.font = '14px "Orbitron", sans-serif';
-            const textX = checkboxX + CHECKBOX_SIZE + CHECKBOX_TEXT_SPACING +100;
+            const textX = checkboxX + CHECKBOX_SIZE + CHECKBOX_TEXT_SPACING;
             const maxTextWidth = PANEL_WIDTH - (PANEL_PADDING * 2) - (CHECKBOX_SIZE + CHECKBOX_TEXT_SPACING + 10);
             
             // Get the description text, handling both static and dynamic descriptions
@@ -205,26 +198,28 @@ export class UISystem {
         ctx.fillStyle = gradient;
         UISystem.roundRect(ctx, x, 10, waveWidth, waveHeight, 10);
         
-        // Wave text
+        // Wave text - make position responsive to screen size
         ctx.fillStyle = '#FF5252';
         ctx.font = 'bold 18px "Orbitron", sans-serif';
         const waveText = 'WAVE';
-        const waveTextX = x + PANEL_PADDING +25;
+        // Center the text in available space by accounting for SCALE
+        const waveTextX = x + PANEL_PADDING * (SCALE / 2);
         ctx.fillText(waveText, waveTextX, 35);
         
-        // Wave number
+        // Wave number - make position responsive to screen size
         ctx.fillStyle = '#FF7070';
         ctx.font = 'bold 32px "Orbitron", sans-serif';
         const waveNumber = game.wave.toString();
-        const waveNumberX = x + PANEL_PADDING + waveNumber.length * 10;
+        // Adjust position based on SCALE
+        const waveNumberX = x + PANEL_PADDING;
         ctx.fillText(waveNumber, waveNumberX, 70);
         
         // Draw wave progress
         const timeInWave = Date.now() - game.waveStartTime;
         const waveProgress = Math.min(timeInWave / game.spawnInterval, 1);
         
-        // Progress bar background
-        const progressBarX = x + PANEL_PADDING + 80;
+        // Progress bar background - adjust position based on SCALE
+        const progressBarX = x + PANEL_PADDING + 80 * (SCALE / 2);
         ctx.fillStyle = 'rgba(255, 82, 82, 0.2)';
         UISystem.roundRect(ctx, progressBarX, 30, 80, 10, 5);
         
@@ -233,25 +228,44 @@ export class UISystem {
         UISystem.roundRect(ctx, progressBarX, 30, 80 * waveProgress, 10, 5);
     }
 
-    static drawWarningMessage(ctx, game) {
+    static drawWarningMessage(game) {
         if (game.warningMessage) {
-            const textMetrics = ctx.measureText(game.warningMessage);
-            const x = (game.canvas.width - textMetrics.width) / 2;
-            const y = game.canvas.height / 2;
+            // Use the showWarning function from constants.js
+            if (typeof window.showWarning === 'function') {
+                window.showWarning(game.warningMessage);
+            } else {
+                // Fallback if showWarning isn't available
+                // Get or create the notification container
+                let container = document.querySelector('.notification-container');
+                if (!container) {
+                    container = document.createElement('div');
+                    container.className = 'notification-container';
+                    document.body.appendChild(container);
+                }
+                
+                // Create the warning message
+                const warningDiv = document.createElement('div');
+                warningDiv.className = 'warning-message';
+                warningDiv.textContent = game.warningMessage;
+                
+                // Add the warning to the container
+                container.appendChild(warningDiv);
+                
+                // Remove this specific warning after animation completes
+                setTimeout(() => {
+                    if (warningDiv.parentNode === container) {
+                        container.removeChild(warningDiv);
+                    }
+                    
+                    // If no warnings left, remove the container
+                    if (container.children.length === 0) {
+                        document.body.removeChild(container);
+                    }
+                }, 2000);
+            }
             
-            // Draw warning background
-            ctx.fillStyle = 'rgba(16, 22, 26, 0.9)';
-            UISystem.roundRect(ctx, x - 20, y - 40, textMetrics.width + 40, 60, 10);
-            
-            // Draw warning border
-            ctx.strokeStyle = '#FF5252';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x - 15, y - 35, textMetrics.width + 30, 50);
-            
-            // Draw warning text
-            ctx.fillStyle = '#FF7070';
-            ctx.font = 'bold 32px "Orbitron", sans-serif';
-            ctx.fillText(game.warningMessage, x, y);
+            // Reset the game's warning message
+            game.warningMessage = '';
         }
     }
 
@@ -289,7 +303,7 @@ export class UISystem {
             // Draw stat label
             ctx.fillStyle = '#7FDBFF';
             ctx.font = '18px "Orbitron", sans-serif';
-            ctx.fillText(stat.label, game.canvas.width / 2 , y + 22);
+            ctx.fillText(stat.label, game.canvas.width / 2 -180 , y + 22);
             
             // Draw stat value
             ctx.fillStyle = '#FFFFFF';
@@ -316,7 +330,7 @@ export class UISystem {
         const buttonText = 'PLAY AGAIN';
         const buttonTextMetrics = ctx.measureText(buttonText);
         const buttonTextX = buttonX + (buttonWidth - buttonTextMetrics.width) / 2 +100;
-        ctx.fillText(buttonText, buttonTextX, buttonY + 38);
+        ctx.fillText(buttonText, buttonTextX-100, buttonY + 38);
         
         // Add button hover effect and click handler
         if (!game.restartButtonListener) {
@@ -408,397 +422,382 @@ export class UISystem {
         const workerBtn = document.querySelector('.worker-btn');
         const turretBtn = document.querySelector('.turret-btn');
         const batteryBtn = document.querySelector('.battery-btn');
+        const missileLauncherBtn = document.querySelector('.missile-launcher-btn');
         const upgradeBtn = document.querySelector('.upgrade-btn');
 
         workerBtn.disabled = game.minerals < COSTS.WORKER;
         turretBtn.disabled = game.minerals < COSTS.TURRET;
         batteryBtn.disabled = game.minerals < COSTS.BATTERY;
+        missileLauncherBtn.disabled = game.minerals < COSTS.MISSILE_LAUNCHER;
         
         if (game.selectedTurret) {
             const upgradeCost = 150 * Math.pow(2, game.selectedTurret.level - 1);
             upgradeBtn.classList.remove('hidden');
             upgradeBtn.disabled = game.minerals < upgradeCost;
             upgradeBtn.textContent = `Upgrade Turret (${upgradeCost} 💎)`;
+        } else if (game.selectedMissileLauncher) {
+            const upgradeCost = 150 * Math.pow(2, game.selectedMissileLauncher.level - 1);
+            upgradeBtn.classList.remove('hidden');
+            upgradeBtn.disabled = game.minerals < upgradeCost;
+            upgradeBtn.textContent = `Upgrade Missile Launcher (${upgradeCost} 💎)`;
         } else {
             upgradeBtn.classList.add('hidden');
         }
     }
 
-    static drawWarningMessage(game) {
-        if (game.warningMessage) {
-            const warningDiv = document.createElement('div');
-            warningDiv.className = 'warning-message';
-            warningDiv.textContent = game.warningMessage;
-            document.body.appendChild(warningDiv);
-            setTimeout(() => warningDiv.remove(), 2000);
-            game.warningMessage = '';
-        }
-    }
-
-    // New method to get control group information for an entity
     static getControlGroupInfo(entity) {
         if (!window.controlGroups) return '';
         
         // Find which control groups this entity belongs to
         const groups = [];
         for (let i = 1; i <= 9; i++) {
-            const group = window.controlGroups[i];
-            if (group) {
-                for (let j = 0; j < group.length; j++) {
-                    const item = group[j];
-                    if (item.entity === entity) {
-                        groups.push(i);
-                        break;
-                    }
-                }
+            if (window.controlGroups[i] && window.controlGroups[i].some(e => e.entity && e.entity.id === entity.id)) {
+                groups.push(i);
             }
         }
         
         if (groups.length === 0) {
-            return '<div style="font-style: italic; color: #999;">Not assigned to any control group</div>';
+            return '<div class="control-group-info">No control group assigned</div>';
         }
         
-        return `<div style="color: #4a9eff;">Control Group${groups.length > 1 ? 's' : ''}: ${groups.join(', ')}</div>`;
+        const groupText = groups.length > 1 ? 'Control Groups' : 'Control Group';
+        let html = `<div class="control-group-info">
+            <span style="color:#a0d0ff">${groupText}:</span> `;
+        
+        // Create styled control group indicators
+        groups.forEach((group, index) => {
+            if (index > 0) html += ' ';
+            html += `<span style="display:inline-block; width:18px; height:16px; margin:0 2px; 
+                background:linear-gradient(to bottom, #0a4a96, #042c5c); 
+                border:1px solid #1d6eb8; border-radius:2px; text-align:center; 
+                color:#c8e0ff; font-size:11px; line-height:16px;
+                box-shadow:0 0 3px rgba(0, 60, 120, 0.5); text-shadow:0 0 2px rgba(0, 100, 255, 0.7);">${group}</span>`;
+        });
+        
+        html += '</div>';
+        return html;
     }
 
-    // New method to get control group information for multiple entities
     static getMultipleControlGroupInfo(entities) {
         if (!window.controlGroups || !entities || entities.length === 0) return '';
         
-        // Count how many entities are in each group
+        // Count how many entities are in each control group
         const groupCounts = {};
         for (let i = 1; i <= 9; i++) {
-            groupCounts[i] = 0;
-        }
-        
-        // For each entity, check which groups it belongs to
-        entities.forEach(entity => {
-            for (let i = 1; i <= 9; i++) {
-                const group = window.controlGroups[i];
-                if (group) {
-                    for (let j = 0; j < group.length; j++) {
-                        const item = group[j];
-                        if (item.entity === entity) {
-                            groupCounts[i]++;
-                            break;
-                        }
-                    }
+            if (window.controlGroups[i]) {
+                const count = entities.filter(entity => 
+                    window.controlGroups[i].some(e => e.entity && e.entity.id === entity.id)
+                ).length;
+                
+                if (count > 0) {
+                    groupCounts[i] = count;
                 }
             }
-        });
-        
-        // Filter out groups with no entities
-        const activeGroups = Object.entries(groupCounts)
-            .filter(([_, count]) => count > 0)
-            .map(([group, count]) => `${group} (${count}/${entities.length})`);
-        
-        if (activeGroups.length === 0) {
-            return '<div style="font-style: italic; color: #999;">Not assigned to any control group</div>';
         }
         
-        return `<div style="color: #4a9eff;">Control Group${activeGroups.length > 1 ? 's' : ''}: ${activeGroups.join(', ')}</div>`;
+        if (Object.keys(groupCounts).length === 0) {
+            return '<div class="control-group-info">No control groups assigned</div>';
+        }
+        
+        let html = '<div class="control-group-info"><span style="color:#a0d0ff">Control Group Assignments:</span><div style="margin-top:5px">';
+        
+        // Create control group assignment display with styled indicators
+        for (const [group, count] of Object.entries(groupCounts)) {
+            html += `
+                <div style="display:inline-block; margin-right:10px; margin-bottom:4px">
+                    <span style="display:inline-block; width:18px; height:16px;
+                        background:linear-gradient(to bottom, #0a4a96, #042c5c); 
+                        border:1px solid #1d6eb8; border-radius:2px; text-align:center; 
+                        color:#c8e0ff; font-size:11px; line-height:16px;
+                        box-shadow:0 0 3px rgba(0, 60, 120, 0.5); text-shadow:0 0 2px rgba(0, 100, 255, 0.7);">${group}</span>
+                    <span style="margin-left:4px">${count} unit${count > 1 ? 's' : ''}</span>
+                </div>`;
+        }
+        
+        html += '</div></div>';
+        
+        return html;
     }
 
-    // Update the updateInfoPanel method to include control group information
     static updateInfoPanel(game) {
-        const portrait = document.getElementById('unit-portrait');
-        const name = document.getElementById('unit-name');
-        const stats = document.getElementById('unit-stats');
-        const actionButtons = document.getElementById('action-buttons');
+        const infoPanel = document.getElementById('info-panel');
+        if (!infoPanel) return;
         
-        // Default button layout for building
-        let defaultButtons = `
-            <button id="buildWorkerButton" onclick="game.buildWorker()" class="worker-btn" data-shortcut="Q" data-icon="👷" ${game.minerals < COSTS.WORKER ? 'disabled' : ''}>Worker</button>
-            <button id="buildTurretButton" onclick="game.buildTurret()" class="turret-btn" data-shortcut="T" data-icon="🔫" ${game.minerals < COSTS.TURRET ? 'disabled' : ''}>Turret</button>
-            <button id="buildBatteryButton" onclick="game.buildBattery()" class="battery-btn" data-shortcut="B" data-icon="🛡️" ${game.minerals < COSTS.BATTERY ? 'disabled' : ''}>Shield</button>
-            <button onclick="game.toggleSound()" class="sound-btn" data-shortcut="M" data-icon="🔊">Sound</button>
-            
-            <!-- Empty slots for StarCraft-like grid -->
-            <button style="visibility:hidden"></button>
-            <button style="visibility:hidden"></button>
-            <button style="visibility:hidden"></button>
-            <button style="visibility:hidden"></button>
-            <button style="visibility:hidden"></button>
-        `;
-
-        if (game.selectedBase) {
+        // Default portrait icon
+        let portraitIcon = '?';
+        let html = '';
+        
+        // Check what's selected
+        if (game.selectedBase && game.selectedBase.isSelected) {
+            portraitIcon = '🏢';
             // Base is selected
-            portrait.innerHTML = '🏠';
-            name.textContent = 'Command Center';
-            
-            // Get default mineral patch info
-            const defaultPatch = game.base.defaultMineralPatch;
-            const patchInfo = defaultPatch ? 
-                `Default mineral patch: ${Math.round(defaultPatch.minerals)} minerals (${defaultPatch.workers} workers)` : 
-                'No default mineral patch set (right-click a patch to set)';
-            
-            stats.innerHTML = `
-                <div>HP: ${Math.round(game.base.hp)}/${game.base.maxHp}</div>
-                <div>Status: ${game.base.hp < game.base.maxHp * 0.3 ? '🔴 Critical' : game.base.hp < game.base.maxHp * 0.7 ? '🟠 Damaged' : '🟢 Operational'}</div>
-                <div style="margin-top: 10px; color: #4DB6FF;">Default Mineral Assignment:</div>
-                <div>${defaultPatch ? `💎 ${Math.round(defaultPatch.minerals)} minerals available` : '❌ No default patch set'}</div>
-                <div>${defaultPatch ? `👷 ${defaultPatch.workers} workers assigned` : ''}</div>
-                <div style="font-style: italic; margin-top: 5px; font-size: 0.9em;">Right-click on any mineral patch to set it as default for new workers</div>
-                ${UISystem.getControlGroupInfo(game.base)}
-                <div style="margin-top: 10px; font-style: italic; font-size: 0.9em;">Tip: Ctrl+[1-9] to assign to control group, [1-9] to select</div>
+            html = `
+                <div class="unit-portrait">${portraitIcon}</div>
+                <div class="unit-info">
+                    <div class="unit-name">Command Center</div>
+                    <div class="unit-stats">
+                        <p><span style="color:#8bb8ff">HP:</span> ${Math.floor(game.selectedBase.hp)}/${game.selectedBase.maxHp}</p>
+                        <p><span style="color:#8bb8ff">Workers:</span> ${game.workers.length}</p>
+                        <p><span style="color:#8bb8ff">Minerals:</span> ${game.minerals}</p>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="buildWorkerButton" class="action-btn worker-btn ${game.minerals < COSTS.WORKER ? 'disabled' : ''}" 
+                            onclick="window.toggleBuilding(window.game, 'worker')">
+                            Build Worker (${COSTS.WORKER})
+                        </button>
+                    </div>
+                </div>
             `;
-            
-            // Show base-specific action buttons with StarCraft-style grid
-            actionButtons.innerHTML = `
-                <button id="buildWorkerButton" onclick="game.buildWorker()" class="worker-btn" data-shortcut="Q" data-icon="👷" ${game.minerals < COSTS.WORKER ? 'disabled' : ''}>
-                    Worker
-                </button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button onclick="game.toggleSound()" class="sound-btn" data-shortcut="M" data-icon="🔊">Sound</button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-            `;
-        }
-        else if (game.selectedTurret) {
-            // Turret is selected
-            portrait.innerHTML = '🔫';
-            name.textContent = `Defense Turret Lvl ${game.selectedTurret.level}`;
-            
-            const upgradeCost = 150 * Math.pow(2, game.selectedTurret.level - 1);
-            stats.innerHTML = `
-                <div>HP: ${Math.round(game.selectedTurret.hp)}/${game.selectedTurret.maxHp}</div>
-                <div>Damage: ${game.selectedTurret.damage.toFixed(2)}</div>
-                <div>Range: ${game.selectedTurret.range.toFixed(2)}</div>
-                <div>Fire Rate: ${(1000 / game.selectedTurret.fireRate).toFixed(2)} shots/sec</div>
-                ${UISystem.getControlGroupInfo(game.selectedTurret)}
-                <div style="margin-top: 10px; font-style: italic; font-size: 0.9em;">Tip: Ctrl+[1-9] to assign to control group, [1-9] to select</div>
-            `;
-            
-            // Show turret-specific action buttons with StarCraft-style grid
-            actionButtons.innerHTML = `
-                <button onclick="game.upgradeTurret()" class="upgrade-btn" data-shortcut="U" data-icon="⬆️" ${game.minerals < upgradeCost ? 'disabled' : ''}>
-                    Upgrade
-                </button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button onclick="game.toggleSound()" class="sound-btn" data-shortcut="M" data-icon="🔊">Sound</button>
-                <!-- Empty slots for StarCraft-like grid -->
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-            `;
-        }
-        else if (game.selectedBattery) {
-            // Battery is selected
-            portrait.innerHTML = '🛡️';
-            name.textContent = 'Shield Battery';
-            stats.innerHTML = `
-                <div>HP: ${Math.round(game.selectedBattery.hp)}/${game.selectedBattery.maxHp}</div>
-                <div>Energy: ${Math.round(game.selectedBattery.energy)}/${UNIT_STATS.BATTERY.ENERGY}</div>
-                <div>Range: ${game.selectedBattery.range.toFixed(2)}</div>
-                <div>Healing: ${UNIT_STATS.BATTERY.HEAL_AMOUNT.toFixed(2)} HP per tick</div>
-                <div>Status: ${game.selectedBattery.energy < 10 ? '🔴 Low Energy' : '🟢 Operational'}</div>
-                ${UISystem.getControlGroupInfo(game.selectedBattery)}
-                <div style="margin-top: 10px; font-style: italic; font-size: 0.9em;">Tip: Ctrl+[1-9] to assign to control group, [1-9] to select</div>
-            `;
-            // Battery is selected - only show sound button
-            actionButtons.innerHTML = `
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button onclick="game.toggleSound()" class="sound-btn" data-shortcut="M" data-icon="🔊">Sound</button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-            `;
-        }
-        else if (game.selectedWorker) {
+        } else if (game.selectedWorker && game.selectedWorker.isSelected) {
+            portraitIcon = '👷';
             // Worker is selected
-            portrait.innerHTML = '👷';
-            name.textContent = 'Worker';
+            const worker = game.selectedWorker;
+            const assignedPatch = worker.targetPatch ? 
+                `Mining minerals: ${worker.targetPatch.minerals}` : 
+                'Not assigned to a mineral patch';
             
-            const workerStatus = game.selectedWorker.state === 'toBase' ? 'Returning to Base' :
-                               game.selectedWorker.state === 'toMineral' ? 'Moving to Minerals' :
-                               game.selectedWorker.state === 'mining' ? 'Mining' : 'Idle';
-            
-            // Check if multiple workers are selected
-            const selectedWorkers = game.workers.filter(worker => worker.isSelected);
-            const multipleSelected = selectedWorkers.length > 1;
-            
-            if (multipleSelected) {
-                stats.innerHTML = `
-                    <div>${selectedWorkers.length} Workers Selected</div>
-                    <div>Right-click on a mineral patch to reassign all selected workers</div>
-                    ${UISystem.getMultipleControlGroupInfo(selectedWorkers)}
-                    <div style="margin-top: 10px; font-style: italic; font-size: 0.9em;">Tip: Ctrl+[1-9] to assign to control group, [1-9] to select</div>
-                `;
-            } else {
-                stats.innerHTML = `
-                    <div>HP: ${Math.round(game.selectedWorker.hp)}/${game.selectedWorker.maxHp}</div>
-                    <div>Minerals: ${Math.round(game.selectedWorker.minerals)}/${game.selectedWorker.maxMinerals}</div>
-                    <div>Status: ${workerStatus}</div>
-                    <div>Right-click on a mineral patch to reassign</div>
-                    ${UISystem.getControlGroupInfo(game.selectedWorker)}
-                    <div style="margin-top: 10px; font-style: italic; font-size: 0.9em;">Tip: Ctrl+[1-9] to assign to control group, [1-9] to select</div>
-                `;
+            let mineralsCarried = '';
+            if (worker.minerals > 0) {
+                mineralsCarried = `<p><span style="color:#8bb8ff">Carrying:</span> <span style="color:#00ccff">${worker.minerals}/${worker.maxMinerals}</span> minerals</p>`;
             }
             
-            // Show worker-specific action buttons with StarCraft-style grid
-            actionButtons.innerHTML = `
-                <button id="buildTurretButton" onclick="game.buildTurret()" class="turret-btn" data-shortcut="T" data-icon="🔫" ${game.minerals < COSTS.TURRET ? 'disabled' : ''}>
-                    Turret
-                </button>
-                <button id="buildBatteryButton" onclick="game.buildBattery()" class="battery-btn" data-shortcut="B" data-icon="🛡️" ${game.minerals < COSTS.BATTERY ? 'disabled' : ''}>
-                    Shield
-                </button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button onclick="game.toggleSound()" class="sound-btn" data-shortcut="M" data-icon="🔊">Sound</button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
+            html = `
+                <div class="unit-portrait">${portraitIcon}</div>
+                <div class="unit-info">
+                    <div class="unit-name">Worker Unit</div>
+                    <div class="unit-stats">
+                        <p><span style="color:#8bb8ff">HP:</span> ${Math.floor(worker.hp)}/${worker.maxHp}</p>
+                        ${mineralsCarried}
+                        <p><span style="color:#8bb8ff">Status:</span> ${worker.state.charAt(0).toUpperCase() + worker.state.slice(1)}</p>
+                        <p style="font-size:11px">${assignedPatch}</p>
+                    </div>
+                    ${window.controlGroups ? this.getControlGroupInfo(worker) : ''}
+                </div>
             `;
-        }
-        else if (game.selectedMineralPatch) {
+        } else if (game.selectedTurret && game.selectedTurret.isSelected) {
+            portraitIcon = '🔫';
+            // Turret is selected
+            const turret = game.selectedTurret;
+            const upgradeCost = 150 * Math.pow(2, turret.level - 1);
+            
+            html = `
+                <div class="unit-portrait">${portraitIcon}</div>
+                <div class="unit-info">
+                    <div class="unit-name">Defensive Turret <span style="color:#4eccff">Lvl ${turret.level}</span></div>
+                    <div class="unit-stats">
+                        <p><span style="color:#8bb8ff">HP:</span> ${Math.floor(turret.hp)}/${turret.maxHp}</p>
+                        <p><span style="color:#8bb8ff">Damage:</span> ${turret.damage} <span style="opacity:0.7">per hit</span></p>
+                        <p><span style="color:#8bb8ff">Range:</span> ${turret.range} <span style="opacity:0.7">units</span></p>
+                        <p><span style="color:#8bb8ff">Fire Rate:</span> ${(1000 / turret.fireRate).toFixed(1)} <span style="opacity:0.7">shots/sec</span></p>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="upgradeTurretButton" class="action-btn upgrade-btn ${game.minerals < upgradeCost ? 'disabled' : ''}" 
+                            onclick="window.upgradeTurret(window.game)">
+                            Upgrade (${upgradeCost})
+                        </button>
+                    </div>
+                    ${window.controlGroups ? this.getControlGroupInfo(turret) : ''}
+                </div>
+            `;
+        } else if (game.selectedBattery && game.selectedBattery.isSelected) {
+            portraitIcon = '🛡️';
+            // Battery is selected
+            const battery = game.selectedBattery;
+            
+            const energyPercent = Math.floor((battery.energy / battery.maxEnergy) * 100);
+            const energyColor = energyPercent > 70 ? '#00ff00' : (energyPercent > 30 ? '#ffff00' : '#ff6600');
+            
+            html = `
+                <div class="unit-portrait">${portraitIcon}</div>
+                <div class="unit-info">
+                    <div class="unit-name">Shield Battery</div>
+                    <div class="unit-stats">
+                        <p><span style="color:#8bb8ff">HP:</span> ${Math.floor(battery.hp)}/${battery.maxHp}</p>
+                        <p><span style="color:#8bb8ff">Energy:</span> <span style="color:${energyColor}">${Math.floor(battery.energy)}/${battery.maxEnergy}</span></p>
+                        <p><span style="color:#8bb8ff">Range:</span> ${battery.range} <span style="opacity:0.7">units</span></p>
+                        <p><span style="color:#8bb8ff">Heal Rate:</span> ${battery.healAmount} <span style="opacity:0.7">HP/tick</span></p>
+                    </div>
+                    ${window.controlGroups ? this.getControlGroupInfo(battery) : ''}
+                </div>
+            `;
+        } else if (game.selectedMissileLauncher && game.selectedMissileLauncher.isSelected) {
+            portraitIcon = '🚀';
+            // Missile Launcher is selected
+            const missileLauncher = game.selectedMissileLauncher;
+            const upgradeCost = 150 * Math.pow(2, missileLauncher.level - 1);
+            
+            html = `
+                <div class="unit-portrait">${portraitIcon}</div>
+                <div class="unit-info">
+                    <div class="unit-name">Missile Launcher <span style="color:#4eccff">Lvl ${missileLauncher.level}</span></div>
+                    <div class="unit-stats">
+                        <p><span style="color:#8bb8ff">HP:</span> ${Math.floor(missileLauncher.hp)}/${missileLauncher.maxHp}</p>
+                        <p><span style="color:#8bb8ff">Damage:</span> ${missileLauncher.damage}</p>
+                        <p><span style="color:#ff9955">vs Boss:</span> ${missileLauncher.damage * COMBAT.DAMAGE_MULTIPLIER.BOSS}</p>
+                        <p><span style="color:#8bb8ff">Range:</span> ${missileLauncher.range}</p>
+                    </div>
+                    <div class="action-buttons">
+                        <button id="upgradeMissileLauncherButton" class="action-btn upgrade-btn ${game.minerals < upgradeCost ? 'disabled' : ''}" 
+                            onclick="window.upgradeTurret(window.game)">
+                            Upgrade (${upgradeCost})
+                        </button>
+                    </div>
+                    ${window.controlGroups ? this.getControlGroupInfo(missileLauncher) : ''}
+                </div>
+            `;
+        } else if (game.selectedMineralPatch && game.selectedMineralPatch.isSelected) {
+            portraitIcon = '💎';
             // Mineral patch is selected
-            portrait.innerHTML = '💎';
-            name.textContent = 'Mineral Patch';
+            const patch = game.selectedMineralPatch;
+            const percentLeft = Math.floor((patch.minerals / patch.maxMinerals) * 100);
+            const mineralColor = percentLeft > 70 ? '#00ccff' : (percentLeft > 30 ? '#0099cc' : '#006699');
+            const workersOnPatch = game.workers.filter(w => w.targetPatch === patch).length;
             
-            // Calculate minerals per minute based on number of workers
-            const mineralsPerMinute = game.selectedMineralPatch.workers * 10;
+            html = `
+                <div class="unit-portrait">${portraitIcon}</div>
+                <div class="unit-info">
+                    <div class="unit-name">Mineral Deposit</div>
+                    <div class="unit-stats">
+                        <p><span style="color:#8bb8ff">Resources:</span> <span style="color:${mineralColor}">${patch.minerals}</span>/<span style="opacity:0.7">${patch.maxMinerals}</span></p>
+                        <p><span style="color:#8bb8ff">Workers:</span> ${workersOnPatch} mining</p>
+                        <p><span style="color:#8bb8ff">Status:</span> ${percentLeft > 0 ? 'Active' : 'Depleted'}</p>
+                    </div>
+                </div>
+            `;
+        } else if (game.selectedEnemy && game.selectedEnemy.isSelected) {
+            // Enemy is selected - assign appropriate icon based on enemy type
+            switch(game.selectedEnemy.type) {
+                case 'fast':
+                    portraitIcon = '⚡'; // Fast enemy icon
+                    break;
+                case 'tank':
+                    portraitIcon = '🛡️'; // Tank enemy icon
+                    break;
+                case 'elite':
+                    portraitIcon = '⭐'; // Elite enemy icon
+                    break;
+                case 'boss':
+                    portraitIcon = '👑'; // Boss enemy icon
+                    break;
+                default: // normal
+                    portraitIcon = '👾'; // Normal enemy icon
+            }
             
-            stats.innerHTML = `
-                <div>Minerals: ${Math.round(game.selectedMineralPatch.minerals)}/${game.selectedMineralPatch.maxMinerals}</div>
-                <div>Workers: ${game.selectedMineralPatch.workers}</div>
-                <div>Mining rate: ${mineralsPerMinute.toFixed(2)} minerals/min</div>
-                <div>Status: ${game.selectedMineralPatch.minerals < 1000 ? '🔴 Depleting' : '🟢 Abundant'}</div>
-                <div>Right-click with workers selected to mine here</div>
-            `;
-            // Mineral patch is selected - only show sound button
-            actionButtons.innerHTML = `
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button onclick="game.toggleSound()" class="sound-btn" data-shortcut="M" data-icon="🔊">Sound</button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-            `;
-        }
-        else if (game.selectedEnemy) {
-            // Enemy is selected
             const enemy = game.selectedEnemy;
+            const healthPercent = Math.floor((enemy.hp / enemy.maxHp) * 100);
+            const healthColor = healthPercent > 70 ? '#00ff00' : (healthPercent > 30 ? '#ffff00' : '#ff6600');
             
-            // Different portrait icons for different enemy types
-            const enemyPortraits = {
-                'normal': '👾',
-                'elite': '💀',
-                'fast': '⚡',
-                'tank': '🛡️',
-                'boss': '👹'
-            };
-            portrait.innerHTML = enemyPortraits[enemy.type] || '👾';
+            // Format enemy type name with proper capitalization
+            const typeFormatted = enemy.type.charAt(0).toUpperCase() + enemy.type.slice(1);
             
-            // Get the enemy name based on type
-            const enemyNames = {
-                'normal': 'Standard Enemy',
-                'elite': 'Elite Enemy',
-                'fast': 'Swift Striker',
-                'tank': 'Heavy Tank',
-                'boss': 'Boss Enemy'
-            };
-            name.textContent = enemyNames[enemy.type] || 'Enemy';
+            // Create specific descriptions based on enemy type
+            let enemyDescription = '';
+            switch(enemy.type) {
+                case 'fast':
+                    enemyDescription = '<span style="color:#ff6b6b">Quick and agile unit with low HP</span>';
+                    break;
+                case 'tank':
+                    enemyDescription = '<span style="color:#8b0000">Heavily armored unit with high HP</span>';
+                    break;
+                case 'elite':
+                    enemyDescription = '<span style="color:#ffff00">Enhanced enemy with improved stats</span>';
+                    break;
+                case 'boss':
+                    enemyDescription = '<span style="color:#ff44aa">Powerful enemy with massive health pool</span>';
+                    break;
+                default: // normal
+                    enemyDescription = '<span style="color:#ff0000">Standard enemy unit</span>';
+            }
             
-            stats.innerHTML = `
-                <div>HP: ${Math.round(enemy.hp)}/${Math.round(enemy.maxHp)}</div>
-                <div>Damage: ${enemy.damage.toFixed(2)}</div>
-                <div>Speed: ${enemy.speed.toFixed(2)}</div>
-                <div>Type: ${enemy.type.charAt(0).toUpperCase() + enemy.type.slice(1)}</div>
-                <div>Target: ${enemy.currentTarget ? 
-                    (enemy.currentTarget === game.base ? 'Base' : 
-                    game.turrets.includes(enemy.currentTarget) ? 'Turret' : 
-                    game.batteries.includes(enemy.currentTarget) ? 'Battery' : 
-                    game.workers.includes(enemy.currentTarget) ? 'Worker' : 'Unknown') : 'None'}</div>
+            html = `
+                <div class="unit-portrait">${portraitIcon}</div>
+                <div class="unit-info">
+                    <div class="unit-name">${typeFormatted} Enemy</div>
+                    <div class="unit-stats">
+                        <p style="font-size:11px;margin-bottom:8px">${enemyDescription}</p>
+                        <p><span style="color:#8bb8ff">HP:</span> <span style="color:${healthColor}">${Math.floor(enemy.hp)}</span>/<span style="opacity:0.8">${Math.floor(enemy.maxHp)}</span></p>
+                        <p><span style="color:#8bb8ff">Damage:</span> <span style="color:#ff9955">${enemy.damage}</span> <span style="opacity:0.7">per hit</span></p>
+                        <p><span style="color:#8bb8ff">Attack Speed:</span> <span style="color:#ff9955">${(1000 / enemy.attackSpeed).toFixed(1)}</span> <span style="opacity:0.7">hits/sec</span></p>
+                        <p><span style="color:#8bb8ff">Move Speed:</span> <span style="color:#4eccff">${enemy.speed.toFixed(1)}</span></p>
+                        <p><span style="color:#8bb8ff">Wave:</span> <span style="color:#ffff00">${game.wave}</span></p>
+                    </div>
+                </div>
             `;
-            // Enemy is selected - only show sound button
-            actionButtons.innerHTML = `
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button onclick="game.toggleSound()" class="sound-btn" data-shortcut="M" data-icon="🔊">Sound</button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
+        } else if (game.selectedEntities && game.selectedEntities.length > 0) {
+            portraitIcon = '⚙️';
+            // Multiple entities selected
+            const workers = game.selectedEntities.filter(e => e instanceof Worker);
+            const turrets = game.selectedEntities.filter(e => e instanceof Turret && !(e instanceof MissileLauncher));
+            const batteries = game.selectedEntities.filter(e => e instanceof Battery);
+            const missileLaunchers = game.selectedEntities.filter(e => e instanceof MissileLauncher);
+            
+            let unitDetails = '';
+            if (workers.length > 0) {
+                unitDetails += `<p><span style="color:#8bb8ff">Workers:</span> ${workers.length}</p>`;
+            }
+            if (turrets.length > 0) {
+                unitDetails += `<p><span style="color:#8bb8ff">Turrets:</span> ${turrets.length}</p>`;
+            }
+            if (batteries.length > 0) {
+                unitDetails += `<p><span style="color:#8bb8ff">Batteries:</span> ${batteries.length}</p>`;
+            }
+            if (missileLaunchers.length > 0) {
+                unitDetails += `<p><span style="color:#8bb8ff">Missile Launchers:</span> ${missileLaunchers.length}</p>`;
+            }
+            
+            html = `
+                <div class="unit-portrait">${portraitIcon}</div>
+                <div class="unit-info">
+                    <div class="unit-name">Multiple Units Selected</div>
+                    <div class="unit-stats">
+                        ${unitDetails}
+                        <p><span style="color:#8bb8ff">Total:</span> ${game.selectedEntities.length} units</p>
+                    </div>
+                    ${window.controlGroups ? this.getMultipleControlGroupInfo(game.selectedEntities) : ''}
+                </div>
+            `;
+        } else {
+            portraitIcon = '🎮';
+            // Nothing selected - show game info
+            html = `
+                <div class="unit-portrait">${portraitIcon}</div>
+                <div class="unit-info">
+                    <div class="unit-name">Base Operations</div>
+                    <div class="unit-stats">
+                        <p><span style="color:#8bb8ff">Minerals:</span> <span style="color:#00ccff">${game.minerals}</span></p>
+                        <p><span style="color:#8bb8ff">Workers:</span> ${game.workers.length}</p>
+                        <p><span style="color:#8bb8ff">Defenses:</span> ${game.turrets.length + game.batteries.length + (game.missileLaunchers ? game.missileLaunchers.length : 0)}</p>
+                        <p><span style="color:#ff9955">Wave:</span> ${game.wave}</p>
+                    </div>
+                </div>
             `;
         }
-        else {
-            // Nothing selected
-            portrait.innerHTML = '?';
-            name.textContent = 'No Selection';
-            stats.innerHTML = 'Select a unit, building, or resource to view information.';
-            // Hide all buttons when nothing is selected
-            actionButtons.innerHTML = `
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-                <button style="visibility:hidden"></button>
-            `;
-        }
         
-        // Show costs in the button tooltips
-        const workerBtn = document.querySelector('.worker-btn');
-        const turretBtn = document.querySelector('.turret-btn');
-        const batteryBtn = document.querySelector('.battery-btn');
-        
-        if (workerBtn) workerBtn.title = "Build Worker (50 💎) - Shortcut: Q";
-        if (turretBtn) turretBtn.title = "Build Turret (100 💎) - Shortcut: T";
-        if (batteryBtn) batteryBtn.title = "Build Shield Battery (150 💎) - Shortcut: B";
-        
-        // Update upgrade button if present
-        const upgradeBtn = document.querySelector('.upgrade-btn');
-        if (upgradeBtn && game.selectedTurret) {
-            const upgradeCost = 150 * Math.pow(2, game.selectedTurret.level - 1);
-            upgradeBtn.title = `Upgrade Turret (${upgradeCost} 💎) - Shortcut: U`;
-        }
-        
-        // Ensure action buttons stay in the right position
-        if (actionButtons) {
-            actionButtons.style.position = 'fixed';
-            actionButtons.style.bottom = '10px';
-            actionButtons.style.right = '10px';
-            actionButtons.style.zIndex = '100';
-        }
+        infoPanel.innerHTML = html;
     }
 
-    // Add a method to draw control group indicators
     static drawControlGroupIndicators(ctx, game) {
         if (!window.controlGroups) return;
         
-        // Draw control group indicators in the top-right corner
+        // Get wave panel dimensions to avoid overlap
+        const waveWidth = 200;
+        const waveHeight = 80;
+        const wavePanelBottom = 10 + waveHeight; // 10px is the top padding of wave panel
+        
+        // Draw control group indicators on the right side, below the wave panel
         const padding = 10;
         const size = 30;
         const spacing = 5;
         const startX = game.canvas.width - padding - (size * 5) - (spacing * 4);
-        const startY = padding;
+        
+        // Position below the wave panel with some extra spacing
+        const startY = wavePanelBottom + padding * 2;
         
         // Draw background for all groups
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.fillRect(
             startX - padding,
-            startY - padding,
+            startY - padding +10,
             (size * 5) + (spacing * 4) + (padding * 2),
             (size * 2) + spacing + (padding * 2)
         );
@@ -808,10 +807,15 @@ export class UISystem {
         ctx.lineWidth = 1;
         ctx.strokeRect(
             startX - padding,
-            startY - padding,
+            startY - padding+10,
             (size * 5) + (spacing * 4) + (padding * 2),
             (size * 2) + spacing + (padding * 2)
         );
+        
+        // Draw title
+        ctx.fillStyle = '#4a9eff';
+        ctx.font = 'bold 12px "Orbitron", sans-serif';
+        ctx.fillText('CONTROL GROUPS', startX, startY - padding + 5);
         
         // Draw each control group indicator
         for (let i = 1; i <= 9; i++) {
@@ -822,7 +826,7 @@ export class UISystem {
             const row = i <= 5 ? 0 : 1;
             const col = i <= 5 ? i - 1 : i - 6;
             const x = startX + (col * (size + spacing));
-            const y = startY + (row * (size + spacing));
+            const y = startY + (row * (size + spacing))+10;
             
             // Draw background
             ctx.fillStyle = hasEntities ? 'rgba(74, 158, 255, 0.3)' : 'rgba(50, 50, 50, 0.3)';
@@ -853,7 +857,6 @@ export class UISystem {
         ctx.textBaseline = 'alphabetic';
     }
 
-    // Add control group indicators to entities
     static drawControlGroupMarker(ctx, entity, x, y, size) {
         if (!window.controlGroups) return;
         

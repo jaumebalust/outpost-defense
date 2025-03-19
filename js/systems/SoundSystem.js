@@ -3,63 +3,102 @@ export class SoundSystem {
         this.sounds = {};
         this.music = null;
         this.isMuted = false;
+        this.musicStarted = false;
         
-        // Initialize all game sounds
+        // Load sounds
         this.loadSounds();
     }
-
+    
     loadSounds() {
-        // UI Sounds (using .wav for better responsiveness)
-        this.addSound('click', 'sounds/click.wav');
-        this.addSound('error', 'sounds/error.wav');
+        // Load sound effects
+        this.sounds = {
+            'click': new Audio('sounds/click.wav'),
+            'build': new Audio('sounds/build.mp3'),
+            'build-worker': new Audio('sounds/build-worker.mp3'),
+            'build-turret': new Audio('sounds/build-turret.mp3'),
+            'build-battery': new Audio('sounds/build-battery.mp3'),
+            'build-missile-launcher': new Audio('sounds/build-missile-launcher.mp3'),
+            'error': new Audio('sounds/error.mp3'),
+            'explosion': new Audio('sounds/explosion.mp3'),
+            'missile': new Audio('sounds/missile.mp3'),
+            'select': new Audio('sounds/select.mp3')
+        };
         
-        // Building Sounds (using .wav for instant feedback)
-        this.addSound('build-worker', 'sounds/build-worker.wav');
-        this.addSound('build-turret', 'sounds/build-turret.wav');
-        this.addSound('build-battery', 'sounds/build-battery.wav');
+        // Set volume for all sounds
+        for (const sound in this.sounds) {
+            this.sounds[sound].volume = 0.3;
+        }
         
-        // Combat Sounds (using .wav for minimal latency)
-        this.addSound('shoot', 'sounds/shoot.wav');
-        this.addSound('explosion', 'sounds/explosion.wav');
-        
-        // Background Music (using .mp3 for better compression on long audio)
-        this.music = new Audio('sounds/background-music.mp3');
+        // Load background music
+        this.music = new Audio('sounds/background.mp3');
         this.music.loop = true;
+        this.music.volume = 0.1;
     }
-
-    addSound(name, path) {
-        this.sounds[name] = new Audio(path);
-    }
-
+    
     play(soundName) {
-        if (this.isMuted || !this.sounds[soundName]) return;
+        if (this.isMuted) return;
         
-        // Clone the audio to allow multiple simultaneous plays
-        const sound = this.sounds[soundName].cloneNode();
-        sound.volume = 0.3; // Adjust volume as needed
-        sound.play().catch(error => console.log("Audio play failed:", error));
+        if (this.sounds[soundName]) {
+            // Clone the audio to allow overlapping sounds
+            const sound = this.sounds[soundName].cloneNode();
+            sound.volume = this.sounds[soundName].volume;
+            sound.play().catch(error => {
+                console.log(`Sound play failed: ${error}`);
+            });
+            
+            // If this is the first user interaction, try to start music
+            if (!this.musicStarted) {
+                this.playMusic();
+            }
+        }
     }
-
+    
     playMusic() {
-        if (this.isMuted || !this.music) return;
-        this.music.volume = 0.1; // Lower volume for background music
-        this.music.play().catch(error => console.log("Music play failed:", error));
+        if (this.isMuted) return;
+        
+        // Try to play music, but don't throw an error if it fails due to autoplay restrictions
+        this.music.play().then(() => {
+            this.musicStarted = true;
+            console.log('Background music started successfully');
+        }).catch(error => {
+            console.log(`Music play failed: ${error}`);
+            // We'll try again on the next user interaction
+        });
     }
-
+    
     stopMusic() {
         if (this.music) {
             this.music.pause();
             this.music.currentTime = 0;
+            this.musicStarted = false;
         }
     }
-
+    
     toggleMute() {
         this.isMuted = !this.isMuted;
+        
         if (this.isMuted) {
-            this.stopMusic();
+            // Pause all sounds
+            for (const sound in this.sounds) {
+                this.sounds[sound].pause();
+                this.sounds[sound].currentTime = 0;
+            }
+            
+            // Pause music
+            if (this.music) {
+                this.music.pause();
+            }
+            
+            return '🔇 Sound Off';
         } else {
-            this.playMusic();
+            // Resume music if it was playing before
+            if (this.musicStarted) {
+                this.music.play().catch(error => {
+                    console.log(`Music resume failed: ${error}`);
+                });
+            }
+            
+            return '🔊 Sound On';
         }
-        return this.isMuted;
     }
 } 

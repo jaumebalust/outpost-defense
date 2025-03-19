@@ -11,6 +11,7 @@
 </head>
 <body>
     <div class="title">Outpost Defense</div>
+    <a target="_blank" href="https://jam.pieter.com" class="vibe-jam-link">🕹️ Vibe Jam 2025</a>
     <div class="game-container">
         <canvas id="gameCanvas"></canvas>
         
@@ -29,17 +30,50 @@
         
         <!-- Action buttons moved outside game-ui to prevent centering -->
         <div class="controls" id="action-buttons">
-            <button onclick="game.buildWorker()" class="worker-btn" data-shortcut="Q" data-icon="👷">Worker</button>
-            <button onclick="game.buildTurret()" class="turret-btn" data-shortcut="T" data-icon="🔫">Turret</button>
-            <button onclick="game.buildBattery()" class="battery-btn" data-shortcut="B" data-icon="🛡️">Shield</button>
-            <button onclick="game.toggleSound()" class="sound-btn" data-shortcut="M" data-icon="🔊">Sound</button>
+            <!-- Command Center buttons - will only show when Command Center is selected -->
+            <div id="command-center-buttons" class="button-group">
+                <button onclick="game.buildWorker()" class="worker-btn" data-shortcut="Q" data-icon="👷">Worker</button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+            </div>
             
-            <!-- Empty slots for StarCraft-like grid -->
-            <button class="hidden-button"></button>
-            <button class="hidden-button"></button>
-            <button class="hidden-button"></button>
-            <button class="hidden-button"></button>
-            <button class="hidden-button"></button>
+            <!-- Worker buttons - will only show when Worker is selected -->
+            <div id="worker-buttons" class="button-group">
+                <button onclick="game.buildTurret()" class="turret-btn" data-shortcut="T" data-icon="🔫">Turret</button>
+                <button onclick="game.buildBattery()" class="battery-btn" data-shortcut="B" data-icon="🛡️">Shield</button>
+                <button onclick="game.buildMissileLauncher()" class="missile-launcher-btn" data-shortcut="M" data-icon="🚀">Missile</button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+            </div>
+            
+            <!-- Default empty buttons - shown when nothing relevant is selected -->
+            <div id="default-buttons" class="button-group">
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+            </div>
+            
+            <!-- Turret buttons - will only show when Turret is selected -->
+            <div id="turret-buttons" class="button-group">
+                <button onclick="game.upgradeTurret()" class="upgrade-btn" data-shortcut="U" data-icon="⬆️">Upgrade</button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+            </div>
+            
+            <!-- Missile Launcher buttons - will only show when Missile Launcher is selected -->
+            <div id="missile-launcher-buttons" class="button-group">
+                <button onclick="game.upgradeTurret()" class="upgrade-btn" data-shortcut="U" data-icon="⬆️">Upgrade</button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+                <button class="hidden-button"></button>
+            </div>
         </div>
         
         <div id="floating-upgrade-btn" class="floating-button hidden">
@@ -51,8 +85,11 @@
     <script type="module">
         import { Game } from './js/game.js';
         import { initializeEventListeners } from './js/systems/InputSystem.js';
-        import { showWarning } from './js/utils/constants.js';
+        import { showWarning, updateScale } from './js/utils/constants.js';
 
+        // Ensure scale is calculated before game initialization
+        updateScale();
+        
         // Initialize game
         const canvas = document.getElementById('gameCanvas');
         const game = new Game(canvas);

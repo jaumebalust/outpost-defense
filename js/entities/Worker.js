@@ -14,6 +14,12 @@ export class Worker extends Entity {
         this.isSelected = false;
     }
 
+    findPathToMineralPatch() {
+        if (this.targetPatch) {
+            this.state = 'toMineral';
+        }
+    }
+
     update() {
         if (this.state === 'toMineral' && this.targetPatch) {
             const dx = this.targetPatch.x - this.x;
@@ -67,8 +73,10 @@ export class Worker extends Entity {
             const dist = Math.hypot(dx, dy);
             
             if (dist < 5) {
-                this.game.minerals += this.minerals;
-                this.game.totalMineralsCollected += this.minerals;
+                // Use game.addMinerals instead of directly modifying minerals
+                // This ensures UI buttons refresh properly
+                this.game.addMinerals(this.minerals);
+                // Reset worker's carried minerals
                 this.minerals = 0;
                 
                 // Clean up any mining state
